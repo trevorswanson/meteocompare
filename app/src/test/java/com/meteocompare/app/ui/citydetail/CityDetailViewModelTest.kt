@@ -16,6 +16,7 @@ import com.meteocompare.app.domain.model.BiasSample
 import com.meteocompare.app.domain.model.BiasVariable
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.CityForecast
@@ -107,6 +108,8 @@ class CityDetailViewModelTest {
     private val collapsedSectionsFlow = MutableStateFlow<Set<CityDetailSection>>(emptySet())
     private val detailViewModeFlow = MutableStateFlow(CityDetailViewMode.DEFAULT)
     private val detailContentTabFlow = MutableStateFlow(CityDetailContentTab.DEFAULT)
+    private val detailLayoutFlow = MutableStateFlow(CityDetailLayout.DEFAULT)
+    private val modelComparisonExpandedFlow = MutableStateFlow(false)
     private val forecastUpdates = MutableSharedFlow<CityForecast>(extraBufferCapacity = 4)
     private val onlineFlow = MutableStateFlow(true)
 
@@ -143,6 +146,8 @@ class CityDetailViewModelTest {
         every { observeCollapsedCityDetailSections(any()) } returns collapsedSectionsFlow
         every { observeCityDetailViewMode(any()) } returns detailViewModeFlow
         every { observeCityDetailContentTab(any()) } returns detailContentTabFlow
+        every { observeCityDetailLayout() } returns detailLayoutFlow
+        every { observeModelComparisonExpanded(any()) } returns modelComparisonExpandedFlow
     }
 
     // Context : on stub getString pour retourner des strings prévisibles.
@@ -427,6 +432,27 @@ class CityDetailViewModelTest {
             unmockkObject(BiasRefreshScheduler)
         }
     }
+
+    @Test
+    fun `organisation de la fiche - expose la preference globale et persiste la comparaison par ville`() =
+        runViewModelTest {
+            val vm = buildViewModel()
+
+            vm.detailLayout.test {
+                assertEquals(CityDetailLayout.FULL_COMPARISON, awaitItem())
+                detailLayoutFlow.value = CityDetailLayout.OVERVIEW
+                assertEquals(CityDetailLayout.OVERVIEW, awaitItem())
+            }
+
+            vm.modelComparisonExpanded.test {
+                assertEquals(false, awaitItem())
+                modelComparisonExpandedFlow.value = true
+                assertEquals(true, awaitItem())
+            }
+
+            vm.setModelComparisonExpanded(true)
+            coVerify { prefs.setModelComparisonExpanded("1", true) }
+        }
 
     @Test
     fun `detail preferences - expose et persiste le mode et l onglet`() =

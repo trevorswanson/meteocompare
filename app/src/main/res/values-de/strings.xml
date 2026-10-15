@@ -1021,4 +1021,8 @@ Daten</string>
     <string name="overview_compare_models">Modelle vergleichen</string>
     <string name="overview_model_comparison_title">Modellvergleich</string>
     <string name="overview_model_comparison_subtitle">Tabellen, Diagramme, Zuverlässigkeit und Entwicklung</string>
+    <string name="settings_city_detail_layout">Ortsseiten öffnen mit</string>
+    <string name="settings_city_detail_layout_desc">Der einfache Überblick zeigt das Wesentliche; der Modellvergleich bleibt direkt darunter verfügbar.</string>
+    <string name="settings_city_detail_layout_overview">Einfacher Überblick</string>
+    <string name="settings_city_detail_layout_full">Vollständiger Modellvergleich</string>
 </resources>

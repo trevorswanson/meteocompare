@@ -1038,4 +1038,8 @@
     <string name="overview_compare_models">Comparer les modèles</string>
     <string name="overview_model_comparison_title">Comparaison des modèles</string>
     <string name="overview_model_comparison_subtitle">Tableaux, graphiques, fiabilité et évolution</string>
+    <string name="settings_city_detail_layout">Ouverture des fiches ville</string>
+    <string name="settings_city_detail_layout_desc">L’aperçu simple montre l’essentiel ; la comparaison des modèles reste accessible juste en dessous.</string>
+    <string name="settings_city_detail_layout_overview">Aperçu simple</string>
+    <string name="settings_city_detail_layout_full">Comparaison complète des modèles</string>
 </resources>

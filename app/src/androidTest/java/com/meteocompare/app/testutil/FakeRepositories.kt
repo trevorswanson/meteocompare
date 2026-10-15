@@ -6,6 +6,7 @@ import com.meteocompare.app.domain.model.BiasVariable
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.CityForecast
@@ -289,6 +290,22 @@ class FakeUserPreferencesRepository @Inject constructor() : UserPreferencesRepos
         contentTabByCity.getOrPut(cityId) { MutableStateFlow(CityDetailContentTab.DEFAULT) }.value = tab
     }
 
+    val cityDetailLayout = MutableStateFlow(CityDetailLayout.DEFAULT)
+    private val comparisonExpandedByCity = mutableMapOf<String, MutableStateFlow<Boolean>>()
+
+    override fun observeCityDetailLayout(): Flow<CityDetailLayout> = cityDetailLayout
+
+    override suspend fun setCityDetailLayout(layout: CityDetailLayout) {
+        cityDetailLayout.value = layout
+    }
+
+    override fun observeModelComparisonExpanded(cityId: String): Flow<Boolean> =
+        comparisonExpandedByCity.getOrPut(cityId) { MutableStateFlow(false) }
+
+    override suspend fun setModelComparisonExpanded(cityId: String, expanded: Boolean) {
+        comparisonExpandedByCity.getOrPut(cityId) { MutableStateFlow(false) }.value = expanded
+    }
+
     override fun observeNotificationSettings(): Flow<NotificationSettings> = notificationSettings
 
     override suspend fun updateNotificationSettings(
@@ -306,6 +323,8 @@ class FakeUserPreferencesRepository @Inject constructor() : UserPreferencesRepos
         forecastEngine.value = ForecastEngine.DEFAULT
         collapsedSectionsByCity.clear()
         viewModeByCity.clear()
+        cityDetailLayout.value = CityDetailLayout.DEFAULT
+        comparisonExpandedByCity.clear()
         contentTabByCity.clear()
     }
 }

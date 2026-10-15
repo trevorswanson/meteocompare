@@ -5,6 +5,7 @@ import com.meteocompare.app.domain.model.UnitSystem
 import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.ForecastEngine
@@ -33,6 +34,10 @@ class UserPreferencesRepositoryImplTest {
             repository.setLanguagePreference(LanguagePreference.SYSTEM)
             repository.setRefreshInterval(RefreshInterval.DEFAULT)
             repository.setForecastEngine(ForecastEngine.DEFAULT)
+            repository.setCityDetailLayout(CityDetailLayout.DEFAULT)
+            listOf("paris", "lyon", "12", "123").forEach { cityId ->
+                repository.setModelComparisonExpanded(cityId, false)
+            }
             listOf("paris", "lyon").forEach { cityId ->
                 CityDetailSection.entries.forEach { section ->
                     repository.setCityDetailSectionCollapsed(cityId, section, collapsed = false)
@@ -147,6 +152,29 @@ class UserPreferencesRepositoryImplTest {
             CityDetailContentTab.PRECIPITATION,
             recreatedRepository.observeCityDetailContentTab("paris").first()
         )
+    }
+
+    @Test
+    fun city_detail_layout_round_trips_across_recreation() = runTest {
+        assertEquals(CityDetailLayout.FULL_COMPARISON, CityDetailLayout.DEFAULT)
+        assertEquals(CityDetailLayout.DEFAULT, repository.observeCityDetailLayout().first())
+
+        repository.setCityDetailLayout(CityDetailLayout.OVERVIEW)
+
+        val recreatedRepository = UserPreferencesRepositoryImpl(context, Dispatchers.IO)
+        assertEquals(CityDetailLayout.OVERVIEW, recreatedRepository.observeCityDetailLayout().first())
+    }
+
+    @Test
+    fun model_comparison_expansion_is_city_specific() = runTest {
+        repository.setModelComparisonExpanded("paris", true)
+        repository.setModelComparisonExpanded("12", true)
+        repository.setModelComparisonExpanded("12", false)
+
+        assertEquals(true, repository.observeModelComparisonExpanded("paris").first())
+        assertEquals(false, repository.observeModelComparisonExpanded("lyon").first())
+        assertEquals(false, repository.observeModelComparisonExpanded("12").first())
+        assertEquals(false, repository.observeModelComparisonExpanded("123").first())
     }
 
     @Test

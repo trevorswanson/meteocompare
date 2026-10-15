@@ -22,5 +22,6 @@ enum class CityDetailSection {
     INSIGHTS,
     TIMELINE,
     DETAILED_FORECAST,
-    MARINE
+    MARINE,
+    OVERVIEW
 }

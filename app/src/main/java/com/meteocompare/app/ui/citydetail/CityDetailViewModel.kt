@@ -18,6 +18,7 @@ import com.meteocompare.app.domain.model.BiasSample
 import com.meteocompare.app.domain.model.BiasVariable
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.CityForecast
@@ -258,6 +259,24 @@ class CityDetailViewModel @Inject constructor(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
                 initialValue = CityDetailContentTab.DEFAULT
+            )
+
+    /** Organisation de la fiche (aperçu simple ou comparaison complète), commune à toutes les villes. */
+    val detailLayout: StateFlow<CityDetailLayout> =
+        userPreferences.observeCityDetailLayout()
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = CityDetailLayout.DEFAULT
+            )
+
+    /** En organisation aperçu : la comparaison détaillée de cette ville est-elle ouverte ? */
+    val modelComparisonExpanded: StateFlow<Boolean> =
+        userPreferences.observeModelComparisonExpanded(cityId)
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = false
             )
 
     init {
@@ -647,6 +666,12 @@ class CityDetailViewModel @Inject constructor(
     fun setDetailContentTab(tab: CityDetailContentTab) {
         persistDetailSetting {
             userPreferences.setCityDetailContentTab(cityId, tab)
+        }
+    }
+
+    fun setModelComparisonExpanded(expanded: Boolean) {
+        persistDetailSetting {
+            userPreferences.setModelComparisonExpanded(cityId, expanded)
         }
     }
 

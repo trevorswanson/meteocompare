@@ -13,6 +13,8 @@ class CityDetailTimelineNavigationTest {
         assertEquals(2, simplifiedTimelineItemIndex(isOnline = true, hasInsights = true))
         assertEquals(2, simplifiedTimelineItemIndex(isOnline = false, hasInsights = false))
         assertEquals(3, simplifiedTimelineItemIndex(isOnline = false, hasInsights = true))
+        // Aperçu + en-tête « Comparaison des modèles » précèdent le résumé du jour.
+        assertEquals(4, simplifiedTimelineItemIndex(isOnline = true, hasInsights = true, hasOverview = true))
     }
 
     @Test

@@ -20,6 +20,7 @@ import com.meteocompare.app.core.locale.localePreferences
 import com.meteocompare.app.core.locale.persistLocalePreference
 import com.meteocompare.app.di.IoDispatcher
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.ForecastEngine
@@ -56,6 +57,9 @@ private val CITY_DETAIL_VIEW_MODES_KEY =
     stringSetPreferencesKey("city_detail_view_modes")
 private val CITY_DETAIL_CONTENT_TABS_KEY =
     stringSetPreferencesKey("city_detail_content_tabs")
+private val CITY_DETAIL_LAYOUT_KEY = stringPreferencesKey("city_detail_layout")
+private val MODEL_COMPARISON_EXPANDED_KEY =
+    stringSetPreferencesKey("expanded_model_comparison_city_ids")
 private val NOTIFICATION_DAILY_SUMMARY_KEY = booleanPreferencesKey("notification_daily_summary")
 private val NOTIFICATION_DAILY_MINUTE_KEY = intPreferencesKey("notification_daily_summary_minute_of_day")
 private val NOTIFICATION_DIVERGENCE_KEY = booleanPreferencesKey("notification_divergence")
@@ -253,6 +257,37 @@ class UserPreferencesRepositoryImpl @Inject constructor(
         cityId: String,
         tab: CityDetailContentTab
     ) = setCityChoice(cityId, CITY_DETAIL_CONTENT_TABS_KEY, tab.name)
+
+    override fun observeCityDetailLayout(): Flow<CityDetailLayout> =
+        safePreferences.map { prefs ->
+            CityDetailLayout.fromString(prefs[CITY_DETAIL_LAYOUT_KEY])
+        }.distinctUntilChanged()
+
+    override suspend fun setCityDetailLayout(layout: CityDetailLayout) =
+        withContext(ioDispatcher) {
+            context.preferencesDataStore.edit { prefs ->
+                prefs[CITY_DETAIL_LAYOUT_KEY] = layout.name
+            }
+            Unit
+        }
+
+    override fun observeModelComparisonExpanded(cityId: String): Flow<Boolean> {
+        val prefix = cityPreferencePrefix(cityId)
+        return safePreferences.map { prefs ->
+            prefs[MODEL_COMPARISON_EXPANDED_KEY].orEmpty().any { it == prefix }
+        }.distinctUntilChanged()
+    }
+
+    override suspend fun setModelComparisonExpanded(cityId: String, expanded: Boolean) =
+        withContext(ioDispatcher) {
+            val prefix = cityPreferencePrefix(cityId)
+            context.preferencesDataStore.edit { prefs ->
+                val current = prefs[MODEL_COMPARISON_EXPANDED_KEY].orEmpty().toMutableSet()
+                if (expanded) current += prefix else current -= prefix
+                prefs[MODEL_COMPARISON_EXPANDED_KEY] = current.toSet()
+            }
+            Unit
+        }
 
     override fun observeNotificationSettings(): Flow<NotificationSettings> =
         safePreferences.map(::readNotificationSettings).distinctUntilChanged()

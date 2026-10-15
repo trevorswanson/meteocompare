@@ -6,6 +6,7 @@ import com.meteocompare.app.core.units.LocalWeatherUnits
 
 import androidx.compose.foundation.selection.selectable
 
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.UnitSystem
 
@@ -127,6 +128,7 @@ fun SettingsScreen(
     val enabled by viewModel.enabledModels.collectAsStateWithLifecycle()
     val unitSystem by viewModel.unitSystem.collectAsStateWithLifecycle()
     val clockFormat by viewModel.clockFormatPreference.collectAsStateWithLifecycle()
+    val cityDetailLayout by viewModel.cityDetailLayout.collectAsStateWithLifecycle()
     val theme by viewModel.themePreference.collectAsStateWithLifecycle()
     val language by viewModel.languagePreference.collectAsStateWithLifecycle()
     val refreshInterval by viewModel.refreshInterval.collectAsStateWithLifecycle()
@@ -228,6 +230,8 @@ fun SettingsScreen(
             unitSystem = unitSystem,
             clockFormat = clockFormat,
             onClockFormatSelected = viewModel::onClockFormatSelected,
+            cityDetailLayout = cityDetailLayout,
+            onCityDetailLayoutSelected = viewModel::onCityDetailLayoutSelected,
             onUnitSystemSelected = viewModel::onUnitSystemSelected,
             theme = theme,
             onThemeSelected = viewModel::onThemeSelected,
@@ -306,7 +310,9 @@ internal fun SettingsContent(
     unitSystem: UnitSystem = UnitSystem.METRIC,
     onUnitSystemSelected: (UnitSystem) -> Unit = {},
     clockFormat: ClockFormatPreference = ClockFormatPreference.AUTO,
-    onClockFormatSelected: (ClockFormatPreference) -> Unit = {}
+    onClockFormatSelected: (ClockFormatPreference) -> Unit = {},
+    cityDetailLayout: CityDetailLayout = CityDetailLayout.DEFAULT,
+    onCityDetailLayoutSelected: (CityDetailLayout) -> Unit = {}
 ) {
     // État du tri des modèles — survit à la rotation et au dark-mode toggle.
     // Défaut ZONE parce que 90% des utilisateurs raisonnent d'abord "modèles
@@ -332,6 +338,25 @@ internal fun SettingsContent(
                 )
                 Spacer(Modifier.height(8.dp))
                 ThemeSelector(selected = theme, onSelect = onThemeSelected)
+            }
+        }
+        item { HorizontalDivider() }
+
+        item {
+            Column(modifier = Modifier.padding(16.dp).testTag(TAG_SETTINGS_CITY_DETAIL_LAYOUT)) {
+                Text(
+                    stringResource(R.string.settings_city_detail_layout),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    stringResource(R.string.settings_city_detail_layout_desc),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(Modifier.height(8.dp))
+                CityDetailLayoutSelector(cityDetailLayout, onCityDetailLayoutSelected)
             }
         }
         item { HorizontalDivider() }
@@ -873,6 +898,37 @@ private fun ModelSortSelector(
 }
 
 @Composable
+internal fun CityDetailLayoutSelector(
+    selected: CityDetailLayout,
+    onSelect: (CityDetailLayout) -> Unit
+) {
+    Column(Modifier.selectableGroup()) {
+        CityDetailLayout.entries.forEach { layout ->
+            Row(
+                modifier = Modifier.fillMaxWidth()
+                    .selectable(
+                        selected = selected == layout,
+                        role = androidx.compose.ui.semantics.Role.RadioButton,
+                        onClick = { onSelect(layout) }
+                    )
+                    .testTag("$TAG_SETTINGS_CITY_DETAIL_LAYOUT_OPTION${layout.name}")
+                    .padding(vertical = 7.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                androidx.compose.material3.RadioButton(
+                    selected = selected == layout, onClick = null
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(when (layout) {
+                    CityDetailLayout.OVERVIEW -> R.string.settings_city_detail_layout_overview
+                    CityDetailLayout.FULL_COMPARISON -> R.string.settings_city_detail_layout_full
+                }))
+            }
+        }
+    }
+}
+
+@Composable
 internal fun ClockFormatSelector(
     selected: ClockFormatPreference,
     onSelect: (ClockFormatPreference) -> Unit
@@ -1077,6 +1133,8 @@ private fun RefreshIntervalSelector(
 internal const val TAG_SETTINGS_ROOT = "settings_root"
 internal const val TAG_SETTINGS_BACK = "settings_back"
 internal const val TAG_SETTINGS_DONATE = "settings_donate"
+internal const val TAG_SETTINGS_CITY_DETAIL_LAYOUT = "settings_city_detail_layout"
+internal const val TAG_SETTINGS_CITY_DETAIL_LAYOUT_OPTION = "settings_city_detail_layout_"
 internal const val TAG_SETTINGS_BIAS_REFRESH = "settings_bias_refresh"
 internal const val TAG_SETTINGS_MODEL = "settings_model_"
 internal const val TAG_SETTINGS_SORT = "settings_sort_"

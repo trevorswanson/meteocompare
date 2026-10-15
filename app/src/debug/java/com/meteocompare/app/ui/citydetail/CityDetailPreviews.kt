@@ -71,6 +71,32 @@ private fun CityDetailScreenLoadedPreview() {
 
 @MeteoScreenPreview
 @Composable
+private fun CityDetailScreenOverviewPreview() {
+    MeteoPreviewSurface {
+        CityDetailContent(
+            state = CityDetailUiState.Loaded(
+                forecast = PreviewFixtures.forecast(),
+                weeklyConfidence = List(7) {
+                    PreviewFixtures.dayConfidence(PreviewFixtures.today.plusDays(it.toLong()))
+                },
+                hourlyBands = PreviewFixtures.confidenceBands(),
+                currentTemp = 22.0,
+                currentCondition = com.meteocompare.app.domain.model.WeatherCondition.PARTLY_CLOUDY,
+                calculatedAt = PreviewFixtures.now,
+                fetchedAt = PreviewFixtures.now.minusSeconds(8 * 60L)
+            ),
+            isRefreshing = false,
+            biasState = PreviewFixtures.biasScreenState(),
+            detailLayout = com.meteocompare.app.domain.model.CityDetailLayout.OVERVIEW,
+            snackbarHostState = remember { SnackbarHostState() },
+            onBack = {},
+            onRefresh = {}
+        )
+    }
+}
+
+@MeteoScreenPreview
+@Composable
 private fun CityDetailScreenLoadingPreview() {
     MeteoPreviewSurface {
         CityDetailContent(

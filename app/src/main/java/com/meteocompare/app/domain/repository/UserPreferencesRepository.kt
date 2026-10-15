@@ -4,6 +4,7 @@ import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.UnitSystem
 
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.ForecastEngine
@@ -69,6 +70,17 @@ interface UserPreferencesRepository {
     /** Dernière famille de données consultée dans la comparaison détaillée. */
     fun observeCityDetailContentTab(cityId: String): Flow<CityDetailContentTab>
     suspend fun setCityDetailContentTab(cityId: String, tab: CityDetailContentTab)
+
+    /** Organisation de toutes les fiches ville : aperçu simple ou comparaison complète. */
+    fun observeCityDetailLayout(): Flow<CityDetailLayout>
+    suspend fun setCityDetailLayout(layout: CityDetailLayout)
+
+    /**
+     * En organisation [CityDetailLayout.OVERVIEW], vrai si l'utilisateur a
+     * ouvert la comparaison détaillée de cette ville (repliée par défaut).
+     */
+    fun observeModelComparisonExpanded(cityId: String): Flow<Boolean>
+    suspend fun setModelComparisonExpanded(cityId: String, expanded: Boolean)
 
     /** Notifications météo locales (résumé quotidien, divergence, changement). */
     fun observeNotificationSettings(): Flow<NotificationSettings>

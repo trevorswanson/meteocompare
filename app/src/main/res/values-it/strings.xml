@@ -1024,4 +1024,8 @@ dato</string>
     <string name="overview_compare_models">Confronta i modelli</string>
     <string name="overview_model_comparison_title">Confronto dei modelli</string>
     <string name="overview_model_comparison_subtitle">Tabelle, grafici, affidabilità ed evoluzione</string>
+    <string name="settings_city_detail_layout">Le schede città si aprono su</string>
+    <string name="settings_city_detail_layout_desc">La panoramica semplice mostra l’essenziale; il confronto dei modelli resta disponibile subito sotto.</string>
+    <string name="settings_city_detail_layout_overview">Panoramica semplice</string>
+    <string name="settings_city_detail_layout_full">Confronto completo dei modelli</string>
 </resources>

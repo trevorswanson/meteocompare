@@ -1038,4 +1038,8 @@
     <string name="overview_compare_models">Compare models</string>
     <string name="overview_model_comparison_title">Model comparison</string>
     <string name="overview_model_comparison_subtitle">Tables, charts, reliability and evolution</string>
+    <string name="settings_city_detail_layout">City pages open on</string>
+    <string name="settings_city_detail_layout_desc">The simple overview shows the essentials; the model comparison stays available just below.</string>
+    <string name="settings_city_detail_layout_overview">Simple overview</string>
+    <string name="settings_city_detail_layout_full">Full model comparison</string>
 </resources>

@@ -2,6 +2,8 @@ package com.meteocompare.app.ui.citydetail
 
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.v2.createComposeRule
@@ -13,6 +15,7 @@ import androidx.compose.ui.test.performScrollToNode
 import androidx.test.platform.app.InstrumentationRegistry
 import com.meteocompare.app.R
 import com.meteocompare.app.domain.model.City
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.VigilanceColor
 import com.meteocompare.app.domain.model.VigilanceForecast
@@ -24,6 +27,8 @@ import com.meteocompare.app.domain.model.VigilanceScope
 import com.meteocompare.app.domain.usecase.ConfidenceCalculator
 import com.meteocompare.app.domain.usecase.EqualWeighting
 import com.meteocompare.app.testutil.TestFixtures
+import com.meteocompare.app.ui.citydetail.overview.TAG_MODEL_COMPARISON_GROUP
+import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_SECTION
 import com.meteocompare.app.ui.components.TAG_VIGILANCE_DETAIL
 import com.meteocompare.app.ui.theme.MeteoCompareTheme
 import org.junit.Assert.assertEquals
@@ -416,5 +421,86 @@ class CityDetailContentTest {
 
         assertEquals(CityDetailSection.CONFIDENCE, changedSection)
         assertEquals(false, expandedValue)
+    }
+
+    private fun loadedState(): CityDetailUiState.Loaded {
+        val forecast = TestFixtures.forecast()
+        val calculator = ConfidenceCalculator(EqualWeighting())
+        return CityDetailUiState.Loaded(
+            forecast = forecast,
+            weeklyConfidence = calculator.weeklyConfidence(forecast),
+            hourlyBands = calculator.hourlyTemperatureConfidence(forecast),
+            hourlyPrecipBands = calculator.hourlyPrecipitationConfidence(forecast),
+            hourlyWindBands = calculator.hourlyWindConfidence(forecast),
+            currentTemp = calculator.currentTemperature(forecast),
+            currentCondition = calculator.currentWeatherCondition(forecast),
+            currentCloudCover = calculator.currentCloudCover(forecast),
+            dailyConditions = calculator.dailyConditionsByModel(forecast),
+            calculatedAt = TestFixtures.now,
+            fetchedAt = forecast.fetchedAt
+        )
+    }
+
+    @Test
+    fun full_comparison_layout_keeps_the_historical_screen() {
+        composeRule.setContent {
+            MeteoCompareTheme {
+                CityDetailContent(
+                    state = loadedState(),
+                    isRefreshing = false,
+                    biasState = BiasScreenState.EMPTY,
+                    detailLayout = CityDetailLayout.FULL_COMPARISON,
+                    onBack = {}, onRefresh = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(TAG_OVERVIEW_SECTION).assertDoesNotExist()
+        composeRule.onNodeWithTag(TAG_MODEL_COMPARISON_GROUP).assertDoesNotExist()
+        composeRule.onAllNodesWithTag(TAG_CONFIDENCE_BADGE, useUnmergedTree = true).assertCountEquals(1)
+    }
+
+    @Test
+    fun overview_layout_shows_overview_first_and_folds_the_comparison() {
+        composeRule.setContent {
+            MeteoCompareTheme {
+                CityDetailContent(
+                    state = loadedState(),
+                    isRefreshing = false,
+                    biasState = BiasScreenState.EMPTY,
+                    detailLayout = CityDetailLayout.OVERVIEW,
+                    modelComparisonExpanded = false,
+                    onBack = {}, onRefresh = {}
+                )
+            }
+        }
+
+        composeRule.onNodeWithTag(TAG_OVERVIEW_SECTION).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG_DETAIL_LOADED).performScrollToNode(hasTestTag(TAG_MODEL_COMPARISON_GROUP))
+        composeRule.onAllNodesWithTag(TAG_CONFIDENCE_BADGE, useUnmergedTree = true).assertCountEquals(0)
+    }
+
+    @Test
+    fun opening_the_comparison_group_restores_the_detailed_sections() {
+        var expandedRequest: Boolean? = null
+        composeRule.setContent {
+            MeteoCompareTheme {
+                CityDetailContent(
+                    state = loadedState(),
+                    isRefreshing = false,
+                    biasState = BiasScreenState.EMPTY,
+                    detailLayout = CityDetailLayout.OVERVIEW,
+                    // Aperçu replié pour que la comparaison tienne à l'écran.
+                    collapsedSections = setOf(CityDetailSection.OVERVIEW),
+                    modelComparisonExpanded = true,
+                    onModelComparisonExpandedChange = { expandedRequest = it },
+                    onBack = {}, onRefresh = {}
+                )
+            }
+        }
+
+        composeRule.onAllNodesWithTag(TAG_CONFIDENCE_BADGE, useUnmergedTree = true).assertCountEquals(1)
+        composeRule.onNodeWithTag(TAG_MODEL_COMPARISON_GROUP).performClick()
+        assertEquals(false, expandedRequest)
     }
 }

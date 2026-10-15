@@ -70,6 +70,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -102,6 +103,7 @@ import com.meteocompare.app.data.worker.BiasHistoryRefreshState
 import com.meteocompare.app.core.locale.weatherConditionLabelRes
 import com.meteocompare.app.domain.model.BiasVariable
 import com.meteocompare.app.domain.model.CityDetailContentTab
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.CityDetailSection
 import com.meteocompare.app.domain.model.CityDetailViewMode
 import com.meteocompare.app.domain.model.CityForecast
@@ -144,6 +146,12 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import com.meteocompare.app.domain.util.WeatherScenarioBuilder
+import com.meteocompare.app.domain.util.forecastIsNightAt
+import com.meteocompare.app.ui.citydetail.overview.ModelComparisonGroupHeader
+import com.meteocompare.app.ui.citydetail.overview.OverviewSection
+import com.meteocompare.app.ui.citydetail.overview.buildOverviewModel
 
 // ============================================================================
 //  Public screen entry
@@ -232,6 +240,8 @@ private fun CityDetailLoadedStateBridge(
     val collapsedSections by viewModel.collapsedSections.collectAsStateWithLifecycle()
     val detailViewMode by viewModel.detailViewMode.collectAsStateWithLifecycle()
     val detailContentTab by viewModel.detailContentTab.collectAsStateWithLifecycle()
+    val detailLayout by viewModel.detailLayout.collectAsStateWithLifecycle()
+    val modelComparisonExpanded by viewModel.modelComparisonExpanded.collectAsStateWithLifecycle()
 
     LoadedView(
         forecast = loaded.forecast,
@@ -258,8 +268,11 @@ private fun CityDetailLoadedStateBridge(
         collapsedSections = collapsedSections,
         detailViewMode = detailViewMode,
         detailContentTab = detailContentTab,
+        detailLayout = detailLayout,
+        modelComparisonExpanded = modelComparisonExpanded,
         padding = padding,
         onSectionExpandedChange = viewModel::setSectionExpanded,
+        onModelComparisonExpandedChange = viewModel::setModelComparisonExpanded,
         onDetailViewModeChange = viewModel::setDetailViewMode,
         onDetailContentTabChange = viewModel::setDetailContentTab,
         onRefreshMarine = viewModel::refreshMarine,
@@ -286,6 +299,8 @@ internal fun CityDetailContent(
     collapsedSections: Set<CityDetailSection> = emptySet(),
     detailViewMode: CityDetailViewMode = CityDetailViewMode.DEFAULT,
     detailContentTab: CityDetailContentTab = CityDetailContentTab.DEFAULT,
+    detailLayout: CityDetailLayout = CityDetailLayout.DEFAULT,
+    modelComparisonExpanded: Boolean = false,
     snackbarHostState: SnackbarHostState? = null,
     onBack: () -> Unit,
     onRefresh: () -> Unit,
@@ -293,6 +308,7 @@ internal fun CityDetailContent(
     onSectionExpandedChange: (CityDetailSection, Boolean) -> Unit = { _, _ -> },
     onDetailViewModeChange: (CityDetailViewMode) -> Unit = {},
     onDetailContentTabChange: (CityDetailContentTab) -> Unit = {},
+    onModelComparisonExpandedChange: (Boolean) -> Unit = {},
     onConfidenceClick: (isoDate: String) -> Unit = {},
     onEngineComparisonClick: () -> Unit = {},
     onGraphicViewClick: () -> Unit = {},
@@ -335,8 +351,11 @@ internal fun CityDetailContent(
             collapsedSections = collapsedSections,
             detailViewMode = detailViewMode,
             detailContentTab = detailContentTab,
+            detailLayout = detailLayout,
+            modelComparisonExpanded = modelComparisonExpanded,
             padding = padding,
             onSectionExpandedChange = onSectionExpandedChange,
+            onModelComparisonExpandedChange = onModelComparisonExpandedChange,
             onDetailViewModeChange = onDetailViewModeChange,
             onDetailContentTabChange = onDetailContentTabChange,
             onRefreshMarine = onRefreshMarine,
@@ -569,9 +588,11 @@ private fun ErrorView(message: String, onRetry: () -> Unit, padding: PaddingValu
 internal fun simplifiedTimelineItemIndex(
     isOnline: Boolean,
     hasInsights: Boolean,
-    hasVigilance: Boolean = false
+    hasVigilance: Boolean = false,
+    hasOverview: Boolean = false
 ): Int =
     (if (isOnline) 0 else 1) + // bannière offline
+            (if (hasOverview) 2 else 0) + // aperçu + en-tête « Comparaison des modèles »
             1 + // résumé du jour
             (if (hasVigilance) 1 else 0) +
             (if (hasInsights) 1 else 0)
@@ -606,6 +627,9 @@ private fun LoadedView(
     detailContentTab: CityDetailContentTab,
     padding: PaddingValues,
     onSectionExpandedChange: (CityDetailSection, Boolean) -> Unit,
+    detailLayout: CityDetailLayout = CityDetailLayout.DEFAULT,
+    modelComparisonExpanded: Boolean = false,
+    onModelComparisonExpandedChange: (Boolean) -> Unit = {},
     onDetailViewModeChange: (CityDetailViewMode) -> Unit,
     onDetailContentTabChange: (CityDetailContentTab) -> Unit,
     onRefreshMarine: () -> Unit,
@@ -620,6 +644,11 @@ private fun LoadedView(
     val timelineExpanded = CityDetailSection.TIMELINE !in collapsedSections
     val detailedForecastExpanded = CityDetailSection.DETAILED_FORECAST !in collapsedSections
     val marineExpanded = CityDetailSection.MARINE !in collapsedSections
+    val showOverview = detailLayout == CityDetailLayout.OVERVIEW
+    val overviewExpanded = CityDetailSection.OVERVIEW !in collapsedSections
+    // En organisation aperçu, la comparaison détaillée reste repliée pour
+    // chaque ville tant que l'utilisateur ne l'a pas ouverte.
+    val showComparisonItems = !showOverview || modelComparisonExpanded
     // Même instant que celui utilisé par le ViewModel pour les agrégats
     // « maintenant » : résumé, chronologie et tableaux restent cohérents.
     val presentationNow = calculatedAt
@@ -654,6 +683,19 @@ private fun LoadedView(
     }
     val forecastEvents = remember(overviewTimeline) { detectForecastEvents(overviewTimeline) }
     val insights = remember(forecastEvents) { buildForecastInsights(forecastEvents) }
+    val overviewModel = if (showOverview) {
+        remember(forecast, baseHourlyTimeline, baseDailyTimeline, insights, presentationNow) {
+            buildOverviewModel(
+                forecast = forecast,
+                hourly = baseHourlyTimeline,
+                daily = baseDailyTimeline,
+                insights = insights,
+                scenarios = WeatherScenarioBuilder.next12h(forecast, presentationNow)
+            )
+        }
+    } else {
+        null
+    }
     val evolutionHighlight = (evolutionState as? ForecastEvolutionState.Loaded)?.highlight
     val hasInsightSection = insights.isNotEmpty() || evolutionHighlight != null
     val timelineAvailableRanges = remember(hourlyTimelinePoints, dailyTimelinePoints) {
@@ -702,8 +744,14 @@ private fun LoadedView(
     val timelineItemIndex = simplifiedTimelineItemIndex(
         isOnline = isOnline,
         hasInsights = hasInsightSection,
-        hasVigilance = vigilance?.activeAlerts?.isNotEmpty() == true
+        hasVigilance = vigilance?.activeAlerts?.isNotEmpty() == true,
+        hasOverview = showOverview
     )
+    val modelComparisonItemIndex = (if (isOnline) 0 else 1) + 1
+    val coroutineScope = rememberCoroutineScope()
+    val currentIsNight = remember(forecast, presentationNow) {
+        forecastIsNightAt(forecast, presentationNow) == true
+    }
     LaunchedEffect(timelineFocusRequestId) {
         if (timelineFocusRequestId > 0) {
             contentListState.animateScrollToItem(timelineItemIndex)
@@ -801,202 +849,233 @@ private fun LoadedView(
             }
         }
 
-        item("today_summary") {
-            summaryDay?.let { today ->
-                TodaySummaryCard(
-                    today = today,
-                    modelCount = forecast.availableModels.size,
-                    forecast = forecast,
-                    now = presentationNow,
+        if (overviewModel != null) {
+            item("overview") {
+                OverviewSection(
+                    model = overviewModel,
+                    timezone = forecast.city.timezone,
                     currentTemp = currentTemp,
                     currentCondition = currentCondition,
-                    currentCloudCover = currentCloudCover,
-                    uvIndex = uvForecast?.at(presentationNow),
-                    fetchedAt = fetchedAt,
-                    isOnline = isOnline,
-                    expanded = todaySummaryExpanded,
+                    currentIsNight = currentIsNight,
+                    expanded = overviewExpanded,
                     onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.TODAY_SUMMARY, expanded)
+                        onSectionExpandedChange(CityDetailSection.OVERVIEW, expanded)
                     },
-                    onConfidenceClick = { onConfidenceClick(today.date.toString()) }
-                )
-            }
-        }
-
-        vigilance?.takeIf { forecast.city.isFrenchLocation && it.activeAlerts.isNotEmpty() }?.let { alertForecast ->
-            item("official_vigilance") {
-                VigilanceDetailCard(
-                    vigilance = alertForecast,
-                    timezone = forecast.city.timezone,
-                    modifier = Modifier.padding(horizontal = 0.dp)
-                )
-            }
-        }
-
-        if (hasInsightSection) {
-            item("forecast_insights") {
-                ForecastInsightsSection(
-                    insights = insights,
-                    evolutionHighlight = evolutionHighlight,
-                    timezone = forecast.city.timezone,
-                    modelCount = forecast.availableModels.size,
-                    referencePoint = overviewTimeline.analysisPoints.firstOrNull(),
-                    expanded = insightsExpanded,
-                    onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.INSIGHTS, expanded)
-                    },
-                    onInsightClick = { insight ->
-                        val target = insightTimelineTarget(insight)
-                        if (target != null) {
-                            onSectionExpandedChange(CityDetailSection.TIMELINE, true)
-                            when {
-                                target.instant != null && TimelineRange.HOURLY in timelineAvailableRanges ->
-                                    timelineRange = TimelineRange.HOURLY
-                                target.date != null && TimelineRange.DAILY in timelineAvailableRanges ->
-                                    timelineRange = TimelineRange.DAILY
-                            }
-                            focusedTimelinePoint = target
-                            timelineFocusRequestId += 1
+                    onWhyClick = { onConfidenceClick((summaryDay?.date ?: cityToday).toString()) },
+                    onCompareModelsClick = {
+                        onModelComparisonExpandedChange(true)
+                        coroutineScope.launch {
+                            contentListState.animateScrollToItem(modelComparisonItemIndex)
                         }
                     }
                 )
             }
-        }
-
-        if (timelineDisplayPoints.isNotEmpty()) {
-            item("simplified_timeline_overview") {
-                SimplifiedTimelineCard(
-                    points = timelineDisplayPoints,
-                    events = timelineEvents,
-                    mode = timelineMode,
-                    timezone = forecast.city.timezone,
-                    focusPoint = focusedTimelinePoint,
-                    focusRequestId = timelineFocusRequestId,
-                    range = timelineRange,
-                    onRangeChange = { newRange ->
-                        timelineRange = newRange
-                        focusedTimelinePoint = null
-                    },
-                    availableRanges = timelineAvailableRanges,
-                    layout = timelineLayout,
-                    onLayoutChange = { newLayout ->
-                        timelineLayoutName = newLayout.name
-                    },
-                    now = presentationNow,
-                    expanded = timelineExpanded,
-                    onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.TIMELINE, expanded)
-                    }
+            item("model_comparison_group") {
+                ModelComparisonGroupHeader(
+                    expanded = modelComparisonExpanded,
+                    onToggle = { onModelComparisonExpandedChange(!modelComparisonExpanded) }
                 )
             }
         }
 
-        if (evolutionState != ForecastEvolutionState.Idle &&
-            evolutionState != ForecastEvolutionState.Unavailable &&
-            evolutionState !is ForecastEvolutionState.Error
-        ) {
-            item("forecast_evolution") {
-                ForecastEvolutionSection(
-                    state = evolutionState,
-                    expanded = evolutionExpanded,
-                    onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.FORECAST_EVOLUTION, expanded)
-                    }
-                )
-            }
-        }
-
-        val hasConfidenceData = hourlyBands.size >= 2 ||
-                hourlyPrecipBands.size >= 2 ||
-                hourlyWindBands.size >= 2
-        if (hasConfidenceData || localRankings.hasAnyRanking) {
-            item("local_reliability") {
-                LocalReliabilitySection(
-                    overallConfidencePercent = summaryDay?.overallPercent,
-                    familyCount = forecast.availableModels
-                        .map(ForecastConsensus::groupFor)
-                        .distinct()
-                        .size,
-                    rankings = localRankings,
-                    tempBands = hourlyBands,
-                    precipBands = hourlyPrecipBands,
-                    windBands = hourlyWindBands,
-                    timezone = forecast.city.timezone,
-                    normals = normals,
-                    expanded = reliabilityExpanded,
-                    onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.CONFIDENCE, expanded)
-                    },
-                    onOpenRanking = { variable ->
-                        localRankingVariableName = variable.name
-                        highlightedRankingModelName = ""
-                        isLocalRankingOpen = true
-                    }
-                )
-            }
-        }
-
-        // Avancement de la collecte pour la variable de l'onglet affiché : les
-        // pastilles « N/14 » et le bandeau parlent ainsi de la même chose.
-        // L'onglet Conditions n'a pas d'indicateur par modèle, donc pas de bandeau.
-        val biasHistoryProgress = when (detailContentTab) {
-            CityDetailContentTab.TEMPERATURE -> biasState.temperature
-            CityDetailContentTab.PRECIPITATION -> biasState.precipitation
-            CityDetailContentTab.WIND -> biasState.wind
-            CityDetailContentTab.CONDITIONS -> null
-        }
-            ?.historyProgress(forecast.availableModels)
-            ?.takeIf { it.shouldShowBanner }
-
-        item("detailed_forecast_section") {
-            DetailedForecastSection(
-                mode = displayMode,
-                tab = detailContentTab,
-                forecast = detailedForecast,
-                dailyConditions = detailedDailyConditions,
-                normals = normals,
-                presentationNow = presentationNow,
-                cityToday = cityToday,
-                biasHistoryProgress = biasHistoryProgress,
-                biasHistoryRefreshState = biasHistoryRefreshState,
-                onRequestBiasHistory = onRequestBiasHistory,
-                onModeChange = { onDetailViewModeChange(it.toPreference()) },
-                onTabChange = onDetailContentTabChange,
-                temperatureBiasProvider = { model -> biasState.temperature.biasByModel[model] },
-                precipitationBiasProvider = { model -> biasState.precipitation.biasByModel[model] },
-                windBiasProvider = { model -> biasState.wind.biasByModel[model] },
-                temperatureSampleCountProvider = { model ->
-                    biasState.temperature.historyByModel[model]?.size ?: 0
-                },
-                precipitationSampleCountProvider = { model ->
-                    biasState.precipitation.historyByModel[model]?.size ?: 0
-                },
-                windSampleCountProvider = { model ->
-                    biasState.wind.historyByModel[model]?.size ?: 0
-                },
-                onBiasChipClick = { model, bias ->
-                    selectedModelName = model.name
-                    selectedVariableName = bias.variable.name
-                },
-                expanded = detailedForecastExpanded,
-                onExpandedChange = { expanded ->
-                    onSectionExpandedChange(CityDetailSection.DETAILED_FORECAST, expanded)
+        if (showComparisonItems) {
+            item("today_summary") {
+                summaryDay?.let { today ->
+                    TodaySummaryCard(
+                        today = today,
+                        modelCount = forecast.availableModels.size,
+                        forecast = forecast,
+                        now = presentationNow,
+                        currentTemp = currentTemp,
+                        currentCondition = currentCondition,
+                        currentCloudCover = currentCloudCover,
+                        uvIndex = uvForecast?.at(presentationNow),
+                        fetchedAt = fetchedAt,
+                        isOnline = isOnline,
+                        expanded = todaySummaryExpanded,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.TODAY_SUMMARY, expanded)
+                        },
+                        onConfidenceClick = { onConfidenceClick(today.date.toString()) }
+                    )
                 }
-            )
-        }
+            }
 
-        if (marineState !is MarineUiState.Idle) {
-            item("marine_section") {
-                MarineSection(
-                    state = marineState,
-                    onRefresh = onRefreshMarine,
-                    expanded = marineExpanded,
-                    coastalVigilance = vigilance?.coastalFloodingAlert,
-                    vigilanceTimezone = forecast.city.timezone,
+            vigilance?.takeIf { forecast.city.isFrenchLocation && it.activeAlerts.isNotEmpty() }?.let { alertForecast ->
+                item("official_vigilance") {
+                    VigilanceDetailCard(
+                        vigilance = alertForecast,
+                        timezone = forecast.city.timezone,
+                        modifier = Modifier.padding(horizontal = 0.dp)
+                    )
+                }
+            }
+
+            if (hasInsightSection) {
+                item("forecast_insights") {
+                    ForecastInsightsSection(
+                        insights = insights,
+                        evolutionHighlight = evolutionHighlight,
+                        timezone = forecast.city.timezone,
+                        modelCount = forecast.availableModels.size,
+                        referencePoint = overviewTimeline.analysisPoints.firstOrNull(),
+                        expanded = insightsExpanded,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.INSIGHTS, expanded)
+                        },
+                        onInsightClick = { insight ->
+                            val target = insightTimelineTarget(insight)
+                            if (target != null) {
+                                onSectionExpandedChange(CityDetailSection.TIMELINE, true)
+                                when {
+                                    target.instant != null && TimelineRange.HOURLY in timelineAvailableRanges ->
+                                        timelineRange = TimelineRange.HOURLY
+                                    target.date != null && TimelineRange.DAILY in timelineAvailableRanges ->
+                                        timelineRange = TimelineRange.DAILY
+                                }
+                                focusedTimelinePoint = target
+                                timelineFocusRequestId += 1
+                            }
+                        }
+                    )
+                }
+            }
+
+            if (timelineDisplayPoints.isNotEmpty()) {
+                item("simplified_timeline_overview") {
+                    SimplifiedTimelineCard(
+                        points = timelineDisplayPoints,
+                        events = timelineEvents,
+                        mode = timelineMode,
+                        timezone = forecast.city.timezone,
+                        focusPoint = focusedTimelinePoint,
+                        focusRequestId = timelineFocusRequestId,
+                        range = timelineRange,
+                        onRangeChange = { newRange ->
+                            timelineRange = newRange
+                            focusedTimelinePoint = null
+                        },
+                        availableRanges = timelineAvailableRanges,
+                        layout = timelineLayout,
+                        onLayoutChange = { newLayout ->
+                            timelineLayoutName = newLayout.name
+                        },
+                        now = presentationNow,
+                        expanded = timelineExpanded,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.TIMELINE, expanded)
+                        }
+                    )
+                }
+            }
+
+            if (evolutionState != ForecastEvolutionState.Idle &&
+                evolutionState != ForecastEvolutionState.Unavailable &&
+                evolutionState !is ForecastEvolutionState.Error
+            ) {
+                item("forecast_evolution") {
+                    ForecastEvolutionSection(
+                        state = evolutionState,
+                        expanded = evolutionExpanded,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.FORECAST_EVOLUTION, expanded)
+                        }
+                    )
+                }
+            }
+
+            val hasConfidenceData = hourlyBands.size >= 2 ||
+                    hourlyPrecipBands.size >= 2 ||
+                    hourlyWindBands.size >= 2
+            if (hasConfidenceData || localRankings.hasAnyRanking) {
+                item("local_reliability") {
+                    LocalReliabilitySection(
+                        overallConfidencePercent = summaryDay?.overallPercent,
+                        familyCount = forecast.availableModels
+                            .map(ForecastConsensus::groupFor)
+                            .distinct()
+                            .size,
+                        rankings = localRankings,
+                        tempBands = hourlyBands,
+                        precipBands = hourlyPrecipBands,
+                        windBands = hourlyWindBands,
+                        timezone = forecast.city.timezone,
+                        normals = normals,
+                        expanded = reliabilityExpanded,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.CONFIDENCE, expanded)
+                        },
+                        onOpenRanking = { variable ->
+                            localRankingVariableName = variable.name
+                            highlightedRankingModelName = ""
+                            isLocalRankingOpen = true
+                        }
+                    )
+                }
+            }
+
+            // Avancement de la collecte pour la variable de l'onglet affiché : les
+            // pastilles « N/14 » et le bandeau parlent ainsi de la même chose.
+            // L'onglet Conditions n'a pas d'indicateur par modèle, donc pas de bandeau.
+            val biasHistoryProgress = when (detailContentTab) {
+                CityDetailContentTab.TEMPERATURE -> biasState.temperature
+                CityDetailContentTab.PRECIPITATION -> biasState.precipitation
+                CityDetailContentTab.WIND -> biasState.wind
+                CityDetailContentTab.CONDITIONS -> null
+            }
+                ?.historyProgress(forecast.availableModels)
+                ?.takeIf { it.shouldShowBanner }
+
+            item("detailed_forecast_section") {
+                DetailedForecastSection(
+                    mode = displayMode,
+                    tab = detailContentTab,
+                    forecast = detailedForecast,
+                    dailyConditions = detailedDailyConditions,
+                    normals = normals,
+                    presentationNow = presentationNow,
+                    cityToday = cityToday,
+                    biasHistoryProgress = biasHistoryProgress,
+                    biasHistoryRefreshState = biasHistoryRefreshState,
+                    onRequestBiasHistory = onRequestBiasHistory,
+                    onModeChange = { onDetailViewModeChange(it.toPreference()) },
+                    onTabChange = onDetailContentTabChange,
+                    temperatureBiasProvider = { model -> biasState.temperature.biasByModel[model] },
+                    precipitationBiasProvider = { model -> biasState.precipitation.biasByModel[model] },
+                    windBiasProvider = { model -> biasState.wind.biasByModel[model] },
+                    temperatureSampleCountProvider = { model ->
+                        biasState.temperature.historyByModel[model]?.size ?: 0
+                    },
+                    precipitationSampleCountProvider = { model ->
+                        biasState.precipitation.historyByModel[model]?.size ?: 0
+                    },
+                    windSampleCountProvider = { model ->
+                        biasState.wind.historyByModel[model]?.size ?: 0
+                    },
+                    onBiasChipClick = { model, bias ->
+                        selectedModelName = model.name
+                        selectedVariableName = bias.variable.name
+                    },
+                    expanded = detailedForecastExpanded,
                     onExpandedChange = { expanded ->
-                        onSectionExpandedChange(CityDetailSection.MARINE, expanded)
+                        onSectionExpandedChange(CityDetailSection.DETAILED_FORECAST, expanded)
                     }
                 )
+            }
+
+            if (marineState !is MarineUiState.Idle) {
+                item("marine_section") {
+                    MarineSection(
+                        state = marineState,
+                        onRefresh = onRefreshMarine,
+                        expanded = marineExpanded,
+                        coastalVigilance = vigilance?.coastalFloodingAlert,
+                        vigilanceTimezone = forecast.city.timezone,
+                        onExpandedChange = { expanded ->
+                            onSectionExpandedChange(CityDetailSection.MARINE, expanded)
+                        }
+                    )
+                }
             }
         }
 

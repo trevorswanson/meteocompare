@@ -1024,4 +1024,8 @@ datos</string>
     <string name="overview_compare_models">Comparar modelos</string>
     <string name="overview_model_comparison_title">Comparación de modelos</string>
     <string name="overview_model_comparison_subtitle">Tablas, gráficos, fiabilidad y evolución</string>
+    <string name="settings_city_detail_layout">Las fichas de ciudad se abren en</string>
+    <string name="settings_city_detail_layout_desc">El resumen simple muestra lo esencial; la comparación de modelos sigue disponible justo debajo.</string>
+    <string name="settings_city_detail_layout_overview">Resumen simple</string>
+    <string name="settings_city_detail_layout_full">Comparación completa de modelos</string>
 </resources>

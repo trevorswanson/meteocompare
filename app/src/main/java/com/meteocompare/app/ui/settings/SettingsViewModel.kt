@@ -7,6 +7,7 @@ import androidx.work.await
 import com.meteocompare.app.R
 import com.meteocompare.app.core.util.runSuspendCatching
 import com.meteocompare.app.data.worker.BiasRefreshScheduler
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.ForecastEngine
@@ -93,6 +94,8 @@ class SettingsViewModel @Inject constructor(
     val unitSystem: StateFlow<UnitSystem> = prefs.observeUnitSystem()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UnitSystem.METRIC)
 
+    val cityDetailLayout: StateFlow<CityDetailLayout> = prefs.observeCityDetailLayout()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), CityDetailLayout.DEFAULT)
     val clockFormatPreference: StateFlow<ClockFormatPreference> = prefs.observeClockFormatPreference()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ClockFormatPreference.AUTO)
 
@@ -246,6 +249,19 @@ class SettingsViewModel @Inject constructor(
                         }
                     )
                 }
+            }
+        }
+    }
+
+    fun onCityDetailLayoutSelected(layout: CityDetailLayout) {
+        viewModelScope.launch {
+            val result = updatePreferenceIfChanged(
+                current = { prefs.observeCityDetailLayout().first() },
+                target = layout,
+                persist = { prefs.setCityDetailLayout(layout) }
+            )
+            if (result == PreferenceUpdateResult.FAILED) {
+                _feedback.send(AppToastEvent.error(R.string.toast_settings_save_error))
             }
         }
     }

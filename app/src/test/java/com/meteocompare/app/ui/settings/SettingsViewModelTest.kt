@@ -8,6 +8,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import java.util.concurrent.ExecutionException
 import com.meteocompare.app.R
 import com.meteocompare.app.data.worker.BiasRefreshScheduler
+import com.meteocompare.app.domain.model.CityDetailLayout
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.ForecastEngine
@@ -80,6 +81,7 @@ class SettingsViewModelTest {
     private val forecastEngineFlow = MutableStateFlow(ForecastEngine.DEFAULT)
 
     private val notificationFlow = MutableStateFlow(NotificationSettings())
+    private val cityDetailLayoutFlow = MutableStateFlow(CityDetailLayout.DEFAULT)
     private val paris = City(id = "paris", name = "Paris", country = "France", latitude = 48.85, longitude = 2.35)
     private val lyon = City(id = "lyon", name = "Lyon", country = "France", latitude = 45.76, longitude = 4.84)
     private val favoritesFlow = MutableStateFlow(listOf(paris, lyon))
@@ -100,6 +102,8 @@ class SettingsViewModelTest {
         coEvery { observeRefreshInterval() } returns refreshIntervalFlow
         every { observeForecastEngine() } returns forecastEngineFlow
         every { observeNotificationSettings() } returns notificationFlow
+        every { observeCityDetailLayout() } returns cityDetailLayoutFlow
+        coEvery { setCityDetailLayout(any()) } answers { cityDetailLayoutFlow.value = firstArg() }
         // Reproduit la mise à jour atomique DataStore sur le flow en mémoire.
         coEvery { updateNotificationSettings(any()) } answers {
             val transform = firstArg<(NotificationSettings) -> NotificationSettings>()
@@ -171,6 +175,15 @@ class SettingsViewModelTest {
 
         coVerify(exactly = 0) { prefs.setClockFormatPreference(any()) }
         verify(exactly = 0) { WidgetRefreshScheduler.triggerImmediateRefresh(any<Context>()) }
+    }
+
+    @Test
+    fun `city page layout choice persists once`() = runTest(dispatcher) {
+        viewModel.onCityDetailLayoutSelected(CityDetailLayout.OVERVIEW)
+        viewModel.onCityDetailLayoutSelected(CityDetailLayout.OVERVIEW)
+
+        assertEquals(CityDetailLayout.OVERVIEW, cityDetailLayoutFlow.value)
+        coVerify(exactly = 1) { prefs.setCityDetailLayout(CityDetailLayout.OVERVIEW) }
     }
 
     @Test

@@ -30,3 +30,24 @@ enum class CityDetailContentTab {
             entries.firstOrNull { it.name == value } ?: DEFAULT
     }
 }
+
+/**
+ * Organisation de la fiche ville.
+ *
+ * [OVERVIEW] place un aperçu simple en tête et regroupe la comparaison
+ * détaillée des modèles dessous, repliée tant que l'utilisateur ne l'ouvre pas.
+ * [FULL_COMPARISON] conserve la fiche historique, sans aperçu. C'est la valeur
+ * par défaut : la mise à jour ne change rien tant que l'utilisateur ne choisit
+ * pas l'aperçu dans les paramètres.
+ */
+enum class CityDetailLayout {
+    OVERVIEW,
+    FULL_COMPARISON;
+
+    companion object {
+        val DEFAULT: CityDetailLayout = FULL_COMPARISON
+
+        fun fromString(value: String?): CityDetailLayout =
+            entries.firstOrNull { it.name == value } ?: DEFAULT
+    }
+}
