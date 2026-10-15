@@ -14,6 +14,7 @@ MAIN_UI = ROOT / "app/src/main/java/com/meteocompare/app/ui"
 DEBUG_UI = ROOT / "app/src/debug/java/com/meteocompare/app/ui"
 EXCLUDED = {
     "navigation/AppNavHost.kt": "navigation wiring only; Hilt destinations have their own stateless previews",
+    "accessibility/ReducedMotion.kt": "reads a system accessibility setting; no visual surface",
 }
 
 
