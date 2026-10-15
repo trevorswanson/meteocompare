@@ -717,13 +717,13 @@ private fun divergenceReasonIcon(reason: DivergenceReason): ImageVector = when (
     DivergenceReason.CONDITION -> Icons.Outlined.Cloud
 }
 
-private data class InsightVisual(
+internal data class InsightVisual(
     val icon: ImageVector,
     val color: Color
 )
 
 @Composable
-private fun insightVisual(insight: ForecastInsight): InsightVisual {
+internal fun insightVisual(insight: ForecastInsight): InsightVisual {
     val levelColor = when (insight.level) {
         ForecastInsightLevel.ALERT -> MaterialTheme.colorScheme.error
         ForecastInsightLevel.WATCH -> MaterialTheme.colorScheme.tertiary
@@ -763,14 +763,14 @@ private fun insightVisual(insight: ForecastInsight): InsightVisual {
     }
 }
 
-private data class ForecastInsightPresentation(
+internal data class ForecastInsightPresentation(
     val title: String,
     val detail: String?,
     val timeLabel: String?
 )
 
 @Composable
-private fun forecastInsightPresentation(
+internal fun forecastInsightPresentation(
     insight: ForecastInsight,
     timezone: String?,
     referencePoint: SimplifiedTimelinePoint?

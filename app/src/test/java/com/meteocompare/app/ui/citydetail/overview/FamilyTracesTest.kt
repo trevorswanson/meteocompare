@@ -89,4 +89,16 @@ class FamilyTracesTest {
 
         assertEquals(emptyList<FamilyTrace>(), buildFamilyTemperatureTraces(forecast, emptyList()))
     }
+
+    @Test
+    fun `l'ecart maximal ne compare que les echeances avec au moins deux lignees`() {
+        val traces = listOf(
+            FamilyTrace(ForecastConsensus.Group.NOAA_GFS, listOf(WeatherModel.GFS), listOf(10.0, 12.0, 30.0)),
+            FamilyTrace(ForecastConsensus.Group.ECMWF_GLOBAL, listOf(WeatherModel.ECMWF), listOf(11.0, 15.0, null))
+        )
+
+        assertEquals(3.0, maxFamilySpread(traces)!!, 1e-9)
+        assertNull(maxFamilySpread(traces.take(1)))
+        assertNull(maxFamilySpread(emptyList()))
+    }
 }

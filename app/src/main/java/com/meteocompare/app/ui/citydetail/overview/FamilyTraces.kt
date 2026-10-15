@@ -6,6 +6,7 @@ import com.meteocompare.app.domain.model.HourlyForecast
 import com.meteocompare.app.domain.model.WeatherModel
 import com.meteocompare.app.domain.usecase.ForecastConsensus
 import java.time.Instant
+import kotlin.math.max
 
 /**
  * Prévision horaire d'une lignée numérique indépendante (ex. ECMWF = IFS + AIFS),
@@ -116,4 +117,17 @@ private fun familyValue(entries: List<ForecastConsensus.Entry<Double>>): Double?
             weights[entry.model]?.let { ForecastConsensus.WeightedEntry(entry.model, entry.value, it) }
         }
     )
+}
+
+/** Écart maximal entre lignées à une même échéance (au moins deux valeurs). */
+internal fun maxFamilySpread(traces: List<FamilyTrace>): Double? {
+    val length = traces.maxOfOrNull { it.values.size } ?: return null
+    var best: Double? = null
+    for (index in 0 until length) {
+        val values = traces.mapNotNull { it.values.getOrNull(index)?.takeIf(Double::isFinite) }
+        if (values.size < 2) continue
+        val spread = values.max() - values.min()
+        best = max(best ?: spread, spread)
+    }
+    return best
 }

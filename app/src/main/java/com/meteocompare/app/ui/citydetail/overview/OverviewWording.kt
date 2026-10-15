@@ -64,3 +64,22 @@ internal fun rainIntensity(mmPerHour: Double?, thresholdMm: Double): RainIntensi
     mmPerHour < MODERATE_RAIN_MAX_MM_PER_HOUR -> RainIntensity.MODERATE
     else -> RainIntensity.HEAVY
 }
+
+/**
+ * Part du signal pluie utilisée pour l'opacité : probabilité moyenne quand
+ * elle existe, sinon part des lignées humides.
+ */
+internal fun likelihoodFraction(hour: OverviewPrecipHour): Float = when (hour.wording) {
+    RainLikelihoodWording.CHANCE -> (hour.likelihoodPercent ?: 0) / 100f
+    RainLikelihoodWording.FAMILY_SHARE, null -> {
+        val share = hour.familyShare
+        if (share.total > 0) share.wet.toFloat() / share.total else (hour.likelihoodPercent ?: 0) / 100f
+    }
+}.coerceIn(0f, 1f)
+
+internal fun intensityHeight(intensity: RainIntensity): Float = when (intensity) {
+    RainIntensity.NONE -> 0f
+    RainIntensity.LIGHT -> 0.35f
+    RainIntensity.MODERATE -> 0.65f
+    RainIntensity.HEAVY -> 1f
+}
