@@ -4,6 +4,8 @@ import androidx.compose.runtime.CompositionLocalProvider
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.units.LocalWeatherUnits
 import com.meteocompare.app.core.units.WeatherUnits
+import com.meteocompare.app.ui.accessibility.LocalReducedMotion
+import com.meteocompare.app.ui.accessibility.rememberSystemReducedMotion
 
 import android.appwidget.AppWidgetManager
 import android.content.Context
@@ -49,9 +51,11 @@ class MainActivity : ComponentActivity() {
             val themePreference by viewModel.themePreference.collectAsStateWithLifecycle()
             val unitSystem by viewModel.unitSystem.collectAsStateWithLifecycle()
             val clockFormat by viewModel.clockFormatPreference.collectAsStateWithLifecycle()
+            val reducedMotion = rememberSystemReducedMotion()
             CompositionLocalProvider(
                 LocalWeatherUnits provides WeatherUnits(unitSystem),
-                LocalClockFormatPreference provides clockFormat
+                LocalClockFormatPreference provides clockFormat,
+                LocalReducedMotion provides reducedMotion
             ) {
                 MeteoCompareTheme(themePreference = themePreference) {
                     AppNavHost()

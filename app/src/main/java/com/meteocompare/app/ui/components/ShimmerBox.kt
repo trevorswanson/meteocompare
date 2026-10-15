@@ -18,6 +18,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.meteocompare.app.ui.accessibility.LocalReducedMotion
 
 /**
  * Placeholder animé pour les loadings — donne un effet skeleton/shimmer en
@@ -36,6 +37,15 @@ fun ShimmerBox(
     modifier: Modifier = Modifier,
     cornerRadius: Dp = 4.dp
 ) {
+    if (LocalReducedMotion.current) {
+        // Animations réduites : simple bloc neutre, sans balayage du gradient.
+        Box(
+            modifier = modifier
+                .clip(RoundedCornerShape(cornerRadius))
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
+        )
+        return
+    }
     val transition = rememberInfiniteTransition(label = "shimmer")
     // L'animation déplace le gradient de -300dp à 1200dp sur 1.2s, en boucle.
     val translateAnim by transition.animateFloat(

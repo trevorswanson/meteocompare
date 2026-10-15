@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.meteocompare.app.domain.model.WeatherCondition
+import com.meteocompare.app.ui.accessibility.LocalReducedMotion
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -75,6 +76,10 @@ internal fun AnimatedWeatherIcon(
     isNight: Boolean = false
 ) {
     val displayedCondition = condition ?: WeatherCondition.UNKNOWN
+    // « Supprimer les animations » : image statique choisie plutôt qu'un cycle
+    // figé à une position arbitraire, et changement de condition instantané.
+    val reducedMotion = LocalReducedMotion.current
+    val effectiveAnimated = animated && !reducedMotion
     val effectivePalette = if (tint == Color.Unspecified) {
         palette
     } else {
@@ -86,7 +91,7 @@ internal fun AnimatedWeatherIcon(
             .size(size)
             .clearAndSetSemantics { }
     ) {
-        if (animateConditionChanges) {
+        if (animateConditionChanges && !reducedMotion) {
             AnimatedContent(
                 targetState = displayedCondition,
                 modifier = Modifier.fillMaxSize(),
@@ -109,7 +114,7 @@ internal fun AnimatedWeatherIcon(
                 WeatherIconCanvas(
                     condition = targetCondition,
                     palette = effectivePalette,
-                    animated = animated,
+                    animated = effectiveAnimated,
                     animationSeed = animationSeed,
                     motionScale = motionScale.coerceIn(0f, 2f),
                     isNight = isNight,
@@ -120,7 +125,7 @@ internal fun AnimatedWeatherIcon(
             WeatherIconCanvas(
                 condition = displayedCondition,
                 palette = effectivePalette,
-                animated = animated,
+                animated = effectiveAnimated,
                 animationSeed = animationSeed,
                 motionScale = motionScale.coerceIn(0f, 2f),
                 isNight = isNight,
