@@ -76,10 +76,3 @@ internal fun likelihoodFraction(hour: OverviewPrecipHour): Float = when (hour.wo
         if (share.total > 0) share.wet.toFloat() / share.total else (hour.likelihoodPercent ?: 0) / 100f
     }
 }.coerceIn(0f, 1f)
-
-internal fun intensityHeight(intensity: RainIntensity): Float = when (intensity) {
-    RainIntensity.NONE -> 0f
-    RainIntensity.LIGHT -> 0.35f
-    RainIntensity.MODERATE -> 0.65f
-    RainIntensity.HEAVY -> 1f
-}

@@ -1401,7 +1401,7 @@ private fun HomeWeatherFooter(
 }
 
 @Composable
-internal fun HomeWeatherScenarioRow(
+private fun HomeWeatherScenarioRow(
     scenario: WeatherScenario,
     rank: Int,
     isNight: Boolean = false

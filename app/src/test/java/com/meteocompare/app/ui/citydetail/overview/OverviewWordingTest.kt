@@ -66,12 +66,4 @@ class OverviewWordingTest {
         assertEquals(0.4f, likelihoodFraction(hour(null, 40, FamilyRainShare(0, 0))), 1e-6f)
         assertEquals(1f, likelihoodFraction(hour(RainLikelihoodWording.CHANCE, 150, FamilyRainShare(0, 0))), 1e-6f)
     }
-
-    @Test
-    fun `la hauteur des barres croit avec l'intensite`() {
-        val heights = RainIntensity.entries.map(::intensityHeight)
-        assertEquals(0f, heights.first(), 0f)
-        assertEquals(heights.sorted(), heights)
-        assertEquals(1f, heights.last(), 0f)
-    }
 }

@@ -1,12 +1,7 @@
 package com.meteocompare.app.ui.citydetail.overview
 
 import com.meteocompare.app.domain.model.WeatherModel
-import com.meteocompare.app.domain.model.WeatherScenario
-import com.meteocompare.app.domain.model.WeatherScenarioKind
 import com.meteocompare.app.ui.citydetail.DisplayMode
-import com.meteocompare.app.ui.citydetail.ForecastInsight
-import com.meteocompare.app.ui.citydetail.ForecastInsightKind
-import com.meteocompare.app.ui.citydetail.ForecastInsightLevel
 import com.meteocompare.app.ui.citydetail.buildSimplifiedTimeline
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -42,7 +37,7 @@ class OverviewModelTest {
 
     @Test
     fun `assemble une heure de pluie par point horaire avec une courbe par lignee`() {
-        val model = buildOverviewModel(forecast, hourly, emptyList(), emptyList(), emptyList())
+        val model = buildOverviewModel(forecast, hourly, emptyList(), OVERVIEW_TEST_START)
 
         assertEquals(hourly.size, model.precipitation.size)
         assertEquals(model.timestamps, model.precipitation.map { it.instant })
@@ -52,7 +47,7 @@ class OverviewModelTest {
 
     @Test
     fun `sans probabilite native la pluie est formulee en part de lignees`() {
-        val model = buildOverviewModel(forecast, hourly, emptyList(), emptyList(), emptyList())
+        val model = buildOverviewModel(forecast, hourly, emptyList(), OVERVIEW_TEST_START)
 
         val wetHour = model.precipitation[3]
         assertEquals(RainLikelihoodWording.FAMILY_SHARE, wetHour.wording)
@@ -61,35 +56,13 @@ class OverviewModelTest {
     }
 
     @Test
-    fun `la fenetre de debut de pluie couvre les lignees pluvieuses`() {
-        val model = buildOverviewModel(forecast, hourly, emptyList(), emptyList(), emptyList())
+    fun `les tranches couvrent toute la fenetre dans l'ordre`() {
+        val model = buildOverviewModel(forecast, hourly, emptyList(), OVERVIEW_TEST_START)
 
-        val onset = requireNotNull(model.rainOnset)
-        assertEquals(model.timestamps[3], onset.earliest)
-        assertEquals(model.timestamps[5], onset.latest)
-        assertEquals(2, onset.familiesWithRain)
-        assertEquals(3, onset.familiesWithData)
-    }
-
-    @Test
-    fun `le titre retient le message le plus important hors simple constat d'accord`() {
-        val insights = listOf(
-            ForecastInsight(kind = ForecastInsightKind.HIGH_AGREEMENT, level = ForecastInsightLevel.POSITIVE, priority = 99),
-            ForecastInsight(kind = ForecastInsightKind.TEMPERATURE_CHANGE, level = ForecastInsightLevel.INFO, priority = 50),
-            ForecastInsight(kind = ForecastInsightKind.RAIN_LIKELY, level = ForecastInsightLevel.WATCH, priority = 10)
+        assertEquals(
+            listOf(DayPeriod.AFTERNOON, DayPeriod.EVENING, DayPeriod.OVERNIGHT, DayPeriod.MORNING),
+            model.periods.map { it.period }
         )
-
-        val model = buildOverviewModel(forecast, hourly, emptyList(), insights, emptyList())
-
-        assertEquals(ForecastInsightKind.RAIN_LIKELY, model.headline?.kind)
-    }
-
-    @Test
-    fun `un scenario unique n'est pas presente comme une alternative`() {
-        val single = listOf(WeatherScenario(kind = WeatherScenarioKind.CLEAR, modelCount = 3, totalModelCount = 3))
-        val two = single + WeatherScenario(kind = WeatherScenarioKind.RAIN, modelCount = 1, totalModelCount = 3)
-
-        assertEquals(emptyList<WeatherScenario>(), buildOverviewModel(forecast, hourly, emptyList(), emptyList(), single).scenarios)
-        assertEquals(two, buildOverviewModel(forecast, hourly, emptyList(), emptyList(), two).scenarios)
+        assertEquals(hourly.size, model.periods.sumOf { it.hourCount })
     }
 }
