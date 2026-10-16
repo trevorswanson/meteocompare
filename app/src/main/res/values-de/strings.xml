@@ -1074,4 +1074,7 @@ Daten</string>
     <string name="overview_when_in_the_afternoon">am Nachmittag</string>
     <string name="overview_when_in_the_evening">am Abend</string>
     <string name="overview_daily_models_range_a11y">Andere Vorhersagen reichen von %1$s bis %2$s</string>
+    <string name="home_tab_weather">Wetter</string>
+    <string name="home_tab_radar">Radar</string>
+    <string name="home_tab_charts">Diagramme</string>
 </resources>

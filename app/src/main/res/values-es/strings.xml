@@ -1077,4 +1077,7 @@ datos</string>
     <string name="overview_when_in_the_afternoon">por la tarde</string>
     <string name="overview_when_in_the_evening">por la noche</string>
     <string name="overview_daily_models_range_a11y">Otras previsiones van de %1$s a %2$s</string>
+    <string name="home_tab_weather">Tiempo</string>
+    <string name="home_tab_radar">Radar</string>
+    <string name="home_tab_charts">Gráficos</string>
 </resources>

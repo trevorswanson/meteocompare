@@ -15,10 +15,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ShowChart
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Cloud
 import androidx.compose.material.icons.filled.Radar
+import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material.icons.outlined.EditLocationAlt
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.Button
@@ -32,6 +35,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.ShortNavigationBar
+import androidx.compose.material3.ShortNavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -84,6 +89,12 @@ import com.meteocompare.app.ui.components.AppToastEffect
 import com.meteocompare.app.ui.components.AppToastEvent
 import com.meteocompare.app.ui.components.OpenMeteoAttribution
 import com.meteocompare.app.ui.components.rememberAppToastDispatcher
+import com.meteocompare.app.ui.graphicview.GraphicForecastContent
+import com.meteocompare.app.ui.graphicview.GraphicForecastUiState
+import com.meteocompare.app.ui.graphicview.GraphicForecastViewModel
+import com.meteocompare.app.ui.radar.RadarContent
+import com.meteocompare.app.ui.radar.RadarViewModel
+import com.meteocompare.app.ui.theme.WeatherAccentTheme
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
 import java.time.LocalDate
@@ -159,8 +170,8 @@ internal fun HomeGateContent(
 }
 
 /**
- * Page principale d'une ville : aperçu simple, sélecteur de ville dans
- * l'en-tête, radar à gauche et paramètres à droite.
+ * Page principale d'une ville : sélecteur de ville dans l'en-tête, paramètres
+ * à droite, et barre de navigation Météo / Radar / Graphiques en bas.
  */
 @Composable
 fun HomeCityScreen(
@@ -169,7 +180,6 @@ fun HomeCityScreen(
     onCityGone: (fallbackCityId: String?) -> Unit,
     onManageCitiesClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onRadarClick: () -> Unit,
     onModelDetailsClick: () -> Unit,
     onConfidenceClick: (isoDate: String) -> Unit,
     homeViewModel: HomeViewModel = hiltViewModel(),
@@ -181,6 +191,7 @@ fun HomeCityScreen(
     val isRefreshing by detailViewModel.isRefreshing.collectAsStateWithLifecycle()
     val uvForecast by detailViewModel.uvForecast.collectAsStateWithLifecycle()
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
+    var selectedTab by rememberSaveable { mutableStateOf(HomeTab.WEATHER) }
 
     LaunchedEffect(cityId) { homeViewModel.rememberSelection(cityId) }
     // Ville supprimée depuis la gestion des villes : basculer sur une autre.
@@ -213,9 +224,14 @@ fun HomeCityScreen(
         onAddCityClick = { showAddSheet = true },
         onManageCitiesClick = onManageCitiesClick,
         onSettingsClick = onSettingsClick,
-        onRadarClick = onRadarClick,
         onModelDetailsClick = onModelDetailsClick,
-        onConfidenceClick = onConfidenceClick
+        onConfidenceClick = onConfidenceClick,
+        selectedTab = selectedTab,
+        onTabSelected = { selectedTab = it },
+        // Les écrans radar et graphiques (et leurs requêtes) ne sont créés
+        // qu'à la première ouverture de l'onglet.
+        radarContent = { modifier -> HomeRadarTab(modifier) },
+        chartsContent = { modifier -> HomeChartsTab(modifier) }
     )
     if (showAddSheet) {
         AddCitySheet(
@@ -262,20 +278,18 @@ internal fun HomeCityContent(
     onAddCityClick: () -> Unit,
     onManageCitiesClick: () -> Unit,
     onSettingsClick: () -> Unit,
-    onRadarClick: () -> Unit,
     onModelDetailsClick: () -> Unit,
-    onConfidenceClick: (isoDate: String) -> Unit
+    onConfidenceClick: (isoDate: String) -> Unit,
+    selectedTab: HomeTab = HomeTab.WEATHER,
+    onTabSelected: (HomeTab) -> Unit = {},
+    radarContent: @Composable (Modifier) -> Unit = {},
+    chartsContent: @Composable (Modifier) -> Unit = {}
 ) {
     val loadedCity = (state as? CityDetailUiState.Loaded)?.forecast?.city
     val city = cities.firstOrNull { it.id == cityId } ?: loadedCity
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                navigationIcon = {
-                    IconButton(onClick = onRadarClick, modifier = Modifier.testTag(TAG_HOME_RADAR)) {
-                        Icon(Icons.Filled.Radar, contentDescription = stringResource(R.string.radar_open))
-                    }
-                },
                 title = {
                     CityPicker(
                         currentCity = city,
@@ -290,27 +304,125 @@ internal fun HomeCityContent(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
-        }
+        },
+        bottomBar = { HomeNavigationBar(selectedTab = selectedTab, onTabSelected = onTabSelected) }
     ) { padding ->
-        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
-            when (state) {
-                CityDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
-                }
-                is CityDetailUiState.Error -> HomeError(message = state.message, onRetry = onRefresh)
-                is CityDetailUiState.Loaded -> PullToRefreshBox(
+        when (selectedTab) {
+            HomeTab.WEATHER -> Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+                HomeWeatherTab(
+                    state = state,
                     isRefreshing = isRefreshing,
+                    uvForecast = uvForecast,
                     onRefresh = onRefresh,
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    HomeOverviewList(
-                        loaded = state,
-                        uvForecast = uvForecast,
-                        onModelDetailsClick = onModelDetailsClick,
-                        onConfidenceClick = onConfidenceClick
-                    )
-                }
+                    onModelDetailsClick = onModelDetailsClick,
+                    onConfidenceClick = onConfidenceClick
+                )
             }
+            HomeTab.RADAR -> radarContent(Modifier.fillMaxSize().padding(padding).testTag(TAG_HOME_RADAR_TAB))
+            HomeTab.CHARTS -> chartsContent(Modifier.fillMaxSize().padding(padding).testTag(TAG_HOME_CHARTS_TAB))
+        }
+    }
+}
+
+/** Onglets de la page principale ; l'ordre est celui de la barre de navigation. */
+internal enum class HomeTab { WEATHER, RADAR, CHARTS }
+
+/** Barre de navigation Material 3 Expressive (format court, icône au-dessus du libellé). */
+@Composable
+private fun HomeNavigationBar(selectedTab: HomeTab, onTabSelected: (HomeTab) -> Unit) {
+    ShortNavigationBar {
+        HomeTab.entries.forEach { tab ->
+            val selected = tab == selectedTab
+            ShortNavigationBarItem(
+                selected = selected,
+                onClick = { onTabSelected(tab) },
+                icon = {
+                    Icon(
+                        imageVector = when (tab) {
+                            HomeTab.WEATHER -> if (selected) Icons.Filled.Cloud else Icons.Outlined.Cloud
+                            HomeTab.RADAR -> Icons.Filled.Radar
+                            HomeTab.CHARTS -> Icons.AutoMirrored.Filled.ShowChart
+                        },
+                        contentDescription = null
+                    )
+                },
+                label = {
+                    Text(
+                        stringResource(
+                            when (tab) {
+                                HomeTab.WEATHER -> R.string.home_tab_weather
+                                HomeTab.RADAR -> R.string.home_tab_radar
+                                HomeTab.CHARTS -> R.string.home_tab_charts
+                            }
+                        )
+                    )
+                },
+                modifier = Modifier.testTag("$TAG_HOME_TAB${tab.name.lowercase()}")
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomeWeatherTab(
+    state: CityDetailUiState,
+    isRefreshing: Boolean,
+    uvForecast: UvForecast?,
+    onRefresh: () -> Unit,
+    onModelDetailsClick: () -> Unit,
+    onConfidenceClick: (isoDate: String) -> Unit
+) {
+    when (state) {
+        CityDetailUiState.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        is CityDetailUiState.Error -> HomeError(message = state.message, onRetry = onRefresh)
+        is CityDetailUiState.Loaded -> PullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = onRefresh,
+            modifier = Modifier.fillMaxSize()
+        ) {
+            HomeOverviewList(
+                loaded = state,
+                uvForecast = uvForecast,
+                onModelDetailsClick = onModelDetailsClick,
+                onConfidenceClick = onConfidenceClick
+            )
+        }
+    }
+}
+
+/** Radar de la ville affichée (même ViewModel que l'ancien écran plein). */
+@Composable
+private fun HomeRadarTab(modifier: Modifier, viewModel: RadarViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    RadarContent(
+        state = state,
+        onRetry = viewModel::retry,
+        onModeChange = viewModel::setMode,
+        onRangeChange = viewModel::setRange,
+        onHorizonChange = viewModel::setHorizon,
+        onFrameChange = viewModel::selectFrame,
+        onPlayPause = viewModel::togglePlayback,
+        onRecalculate = viewModel::recalculateProjection,
+        onViewportSize = viewModel::setViewportSize,
+        modifier = modifier
+    )
+}
+
+/** Graphiques multi-modèles de la ville affichée (même ViewModel que l'ancien écran plein). */
+@Composable
+private fun HomeChartsTab(modifier: Modifier, viewModel: GraphicForecastViewModel = hiltViewModel()) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { viewModel.refreshIfStale() }
+    WeatherAccentTheme(condition = (state as? GraphicForecastUiState.Loaded)?.points?.firstOrNull()?.condition) {
+        when (val current = state) {
+            GraphicForecastUiState.Loading -> Box(modifier, contentAlignment = Alignment.Center) {
+                CircularProgressIndicator()
+            }
+            is GraphicForecastUiState.Error -> HomeError(message = current.message, onRetry = viewModel::retry, modifier = modifier)
+            is GraphicForecastUiState.Loaded -> GraphicForecastContent(state = current, modifier = modifier)
         }
     }
 }
@@ -484,9 +596,9 @@ private fun SettingsAction(onClick: () -> Unit) {
 }
 
 @Composable
-private fun HomeError(message: String, onRetry: () -> Unit) {
+private fun HomeError(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp),
+        modifier = modifier.fillMaxSize().padding(32.dp),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
@@ -505,7 +617,9 @@ internal const val TAG_HOME_CITY_OPTION = "home_city_option_"
 internal const val TAG_HOME_ADD_CITY = "home_add_city"
 internal const val TAG_HOME_MANAGE_CITIES = "home_manage_cities"
 internal const val TAG_HOME_SETTINGS = "home_settings"
-internal const val TAG_HOME_RADAR = "home_radar"
+internal const val TAG_HOME_TAB = "home_tab_"
+internal const val TAG_HOME_RADAR_TAB = "home_radar_tab"
+internal const val TAG_HOME_CHARTS_TAB = "home_charts_tab"
 
 /** Journée [date] de minuit à minuit, avec le même moteur que l'aperçu ; null si trop peu de données. */
 private fun buildDayOutlookFor(

@@ -158,6 +158,7 @@ fun CityDetailScreen(
     onGraphicViewClick: () -> Unit = {},
     onRadarClick: () -> Unit = {},
     showBackButton: Boolean = true,
+    showHeaderActions: Boolean = true,
     viewModel: CityDetailViewModel = hiltViewModel()
 ) {
     // Seuls les états qui pilotent réellement le scaffold sont observés ici.
@@ -204,7 +205,8 @@ fun CityDetailScreen(
         onEngineComparisonClick = onEngineComparisonClick,
         onGraphicViewClick = onGraphicViewClick,
         onRadarClick = onRadarClick,
-        showBackButton = showBackButton
+        showBackButton = showBackButton,
+        showHeaderActions = showHeaderActions
     ) { loaded, padding ->
         CityDetailLoadedStateBridge(
             loaded = loaded,
@@ -358,6 +360,7 @@ private fun CityDetailScaffold(
     onGraphicViewClick: () -> Unit,
     onRadarClick: () -> Unit,
     showBackButton: Boolean,
+    showHeaderActions: Boolean = true,
     loadedContent: @Composable (CityDetailUiState.Loaded, PaddingValues) -> Unit
 ) {
     WeatherAccentTheme(
@@ -439,7 +442,9 @@ private fun CityDetailScaffold(
                                 }
                             }
                         }
-                        if (loaded != null) {
+                        // Fork : radar et graphiques sont dans la barre de navigation de
+                        // l'accueil, le moteur dans les paramètres.
+                        if (loaded != null && showHeaderActions) {
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()

@@ -421,7 +421,8 @@ private fun NavGraphBuilder.commonFullScreenDestinations(navController: NavHostC
 private fun NavGraphBuilder.detailDestinations(
     navController: NavHostController,
     showDetailBackButton: Boolean,
-    initialCityId: String? = null
+    initialCityId: String? = null,
+    showDetailHeaderActions: Boolean = true
 ) {
     val detailRoute = initialCityId
         ?.let(Destinations::cityDetail)
@@ -439,6 +440,7 @@ private fun NavGraphBuilder.detailDestinations(
         CityDetailScreen(
             onBack = { navController.popBackStack() },
             showBackButton = showDetailBackButton,
+            showHeaderActions = showDetailHeaderActions,
             onConfidenceClick = { isoDate ->
                 navController.navigate(Destinations.confidence(cityId, isoDate))
             },
@@ -532,7 +534,6 @@ private fun HomeAppNavHost() {
                 },
                 onManageCitiesClick = { navController.navigate(Destinations.MANAGE_CITIES) },
                 onSettingsClick = { navController.navigate(Destinations.SETTINGS) },
-                onRadarClick = { navController.navigate(Destinations.radar(cityId)) },
                 onModelDetailsClick = { navController.navigate(Destinations.cityDetail(cityId)) },
                 onConfidenceClick = { isoDate ->
                     navController.navigate(Destinations.confidence(cityId, isoDate))
@@ -545,9 +546,12 @@ private fun HomeAppNavHost() {
         }
 
         commonFullScreenDestinations(navController)
+        // Radar et graphiques sont des onglets de l'accueil : la fiche
+        // « Détails des modèles » n'affiche plus ses raccourcis.
         detailDestinations(
             navController = navController,
-            showDetailBackButton = true
+            showDetailBackButton = true,
+            showDetailHeaderActions = false
         )
     }
 }

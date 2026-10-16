@@ -1091,4 +1091,7 @@
     <string name="overview_when_in_the_afternoon">l’après-midi</string>
     <string name="overview_when_in_the_evening">le soir</string>
     <string name="overview_daily_models_range_a11y">Les autres prévisions vont de %1$s à %2$s</string>
+    <string name="home_tab_weather">Météo</string>
+    <string name="home_tab_radar">Radar</string>
+    <string name="home_tab_charts">Graphiques</string>
 </resources>

@@ -22,6 +22,7 @@ import com.meteocompare.app.testutil.TestFixtures
 import com.meteocompare.app.ui.citydetail.TAG_DETAIL_LOADED
 import com.meteocompare.app.ui.citydetail.TAG_ENGINE_COMPARISON_ACTION
 import com.meteocompare.app.ui.citydetail.TAG_GRAPHIC_VIEW_ACTION
+import com.meteocompare.app.ui.citydetail.TAG_RADAR_ACTION
 import com.meteocompare.app.ui.citydetail.confidence.TAG_CONFIDENCE_EXPLANATION_BACK
 import com.meteocompare.app.ui.citydetail.confidence.TAG_CONFIDENCE_EXPLANATION_ROOT
 import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_AGREEMENT
@@ -35,7 +36,9 @@ import com.meteocompare.app.ui.home.TAG_HOME_CITY_PICKER
 import com.meteocompare.app.ui.home.TAG_HOME_EMPTY
 import com.meteocompare.app.ui.home.TAG_HOME_LOADED
 import com.meteocompare.app.ui.home.TAG_HOME_MANAGE_CITIES
-import com.meteocompare.app.ui.home.TAG_HOME_RADAR
+import com.meteocompare.app.ui.home.TAG_HOME_CHARTS_TAB
+import com.meteocompare.app.ui.home.TAG_HOME_RADAR_TAB
+import com.meteocompare.app.ui.home.TAG_HOME_TAB
 import com.meteocompare.app.ui.home.TAG_HOME_SETTINGS
 import com.meteocompare.app.ui.home.TAG_MANAGE_BACK
 import com.meteocompare.app.ui.home.TAG_MANAGE_CONFIRM_REMOVE
@@ -179,7 +182,7 @@ class MainActivityNavigationTest {
     }
 
     @Test
-    fun select_engine_then_open_model_details_and_comparison() {
+    fun select_engine_then_open_model_details_without_shortcuts() {
         openHomeWith(TestFixtures.paris)
 
         composeRule.onNodeWithTag(TAG_HOME_SETTINGS).performClick()
@@ -195,32 +198,34 @@ class MainActivityNavigationTest {
         composeRule.onNodeWithTag(TAG_SETTINGS_BACK).performClick()
 
         openModelDetails()
-        composeRule.onNodeWithTag(TAG_ENGINE_COMPARISON_ACTION).performClick()
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.engine_comparison_title)
-        ).assertIsDisplayed()
+        // Radar et graphiques sont des onglets de l'accueil, le moteur est dans les paramètres.
+        composeRule.onNodeWithTag(TAG_RADAR_ACTION).assertDoesNotExist()
+        composeRule.onNodeWithTag(TAG_ENGINE_COMPARISON_ACTION).assertDoesNotExist()
+        composeRule.onNodeWithTag(TAG_GRAPHIC_VIEW_ACTION).assertDoesNotExist()
     }
 
     @Test
-    fun open_radar_from_home() {
+    fun radar_tab_shows_the_radar_and_weather_tab_returns() {
         openHomeWith(TestFixtures.paris)
 
-        composeRule.onNodeWithTag(TAG_HOME_RADAR).performClick()
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.radar_title)
-        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("${TAG_HOME_TAB}radar").performClick()
+        waitForTag(TAG_HOME_RADAR_TAB)
+        waitForTag(TAG_RADAR_STAGE)
         composeRule.onNodeWithTag(TAG_RADAR_STAGE).assertIsDisplayed()
+        composeRule.onNodeWithTag(TAG_HOME_CITY_PICKER).assert(hasText(TestFixtures.paris.name))
+
+        composeRule.onNodeWithTag("${TAG_HOME_TAB}weather").performClick()
+        waitForTag(TAG_HOME_LOADED)
     }
 
     @Test
-    fun open_graphic_view_from_model_details() {
+    fun charts_tab_shows_the_multi_model_charts() {
         openHomeWith(TestFixtures.paris)
-        openModelDetails()
 
-        composeRule.onNodeWithTag(TAG_GRAPHIC_VIEW_ACTION).performClick()
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.graphic_view_title)
-        ).assertIsDisplayed()
+        composeRule.onNodeWithTag("${TAG_HOME_TAB}charts").performClick()
+        waitForTag(TAG_HOME_CHARTS_TAB)
+        composeRule.onNodeWithTag(TAG_HOME_CHARTS_TAB).assertIsDisplayed()
+        composeRule.onNodeWithTag("${TAG_HOME_TAB}charts").assertIsSelected()
     }
 
     @Test
