@@ -4,7 +4,10 @@ import com.meteocompare.app.core.util.resolveZoneOrUtc
 import com.meteocompare.app.domain.model.CityForecast
 import com.meteocompare.app.domain.model.PrecipitationThresholds
 import com.meteocompare.app.ui.citydetail.SimplifiedTimelinePoint
+import com.meteocompare.app.domain.util.forecastSolarWindow
 import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
 
 /** Une heure de la frise pluie de l'aperçu simple. */
 internal data class OverviewPrecipHour(
@@ -39,12 +42,23 @@ internal data class OverviewModel(
     val precipitation: List<OverviewPrecipHour>,
     val periods: List<PeriodSummary>,
     val narrative: List<NarrativeSentence>,
-    val solarEvent: SolarEvent?
+    val solarEvent: SolarEvent?,
+    /** Étendue min → max des lignées pour chaque jour (barres « autres modèles »). */
+    val dailyRanges: Map<LocalDate, DailyFamilyRange> = emptyMap()
 ) {
     val today: SimplifiedTimelinePoint? get() = daily.firstOrNull()
     val hasRain: Boolean get() = precipitation.any(OverviewPrecipHour::isWet)
     val timestamps: List<Instant> get() = hourly.mapNotNull(SimplifiedTimelinePoint::instant)
 }
+
+/** Version courte des « Prochaines 24 heures » pour une journée, de minuit à minuit. */
+internal data class DayOutlook(
+    val date: LocalDate,
+    val hourly: List<SimplifiedTimelinePoint>,
+    val temperatureTraces: List<FamilyTrace>,
+    val periods: List<PeriodSummary>,
+    val narrative: List<NarrativeSentence>
+)
 
 internal fun buildOverviewModel(
     forecast: CityForecast,
@@ -54,6 +68,75 @@ internal fun buildOverviewModel(
     maxFamilies: Int = MAX_OVERVIEW_FAMILY_TRACES
 ): OverviewModel {
     val zone = resolveZoneOrUtc(forecast.city.timezone)
+    val core = hourlyCore(forecast, hourly, zone, OutlookScope.NEXT_24_HOURS, maxFamilies)
+    val dailyPoints = daily.filter { it.date != null }
+    val solarEvent = nextSolarEvent(forecast, now, zone)
+
+    return OverviewModel(
+        hourly = core.hourly,
+        daily = dailyPoints,
+        agreement = agreementWording(
+            dailyPoints.firstOrNull()?.consensusLevel ?: core.hourly.firstOrNull()?.consensusLevel
+        ),
+        temperatureTraces = core.traces,
+        precipitation = core.precipitation,
+        periods = core.periods,
+        narrative = buildOverviewNarrative(
+            periods = core.periods,
+            precipitation = core.precipitation,
+            daily = dailyPoints,
+            today = now.atZone(zone).toLocalDate(),
+            solarEvent = solarEvent
+        ),
+        solarEvent = solarEvent,
+        dailyRanges = buildDailyFamilyRanges(forecast)
+    )
+}
+
+/**
+ * Journée [date] de minuit à minuit, à partir des points horaires de cette
+ * journée (même chronologie synthétique que les 24 prochaines heures).
+ */
+internal fun buildDayOutlook(
+    forecast: CityForecast,
+    date: LocalDate,
+    hourly: List<SimplifiedTimelinePoint>,
+    maxFamilies: Int = MAX_OVERVIEW_FAMILY_TRACES
+): DayOutlook {
+    val zone = resolveZoneOrUtc(forecast.city.timezone)
+    val dayHourly = hourly.filter { it.instant?.atZone(zone)?.toLocalDate() == date }
+    val core = hourlyCore(forecast, dayHourly, zone, OutlookScope.SINGLE_DAY, maxFamilies)
+    val sunset = forecastSolarWindow(forecast, date).sunset
+    return DayOutlook(
+        date = date,
+        hourly = core.hourly,
+        temperatureTraces = core.traces,
+        periods = core.periods,
+        narrative = buildOverviewNarrative(
+            periods = core.periods,
+            precipitation = core.precipitation,
+            daily = emptyList(),
+            today = date,
+            solarEvent = sunset?.let { SolarEvent(sunset = true, at = it) },
+            scope = OutlookScope.SINGLE_DAY
+        )
+    )
+}
+
+private class HourlyCore(
+    val hourly: List<SimplifiedTimelinePoint>,
+    val traces: List<FamilyTrace>,
+    val precipitation: List<OverviewPrecipHour>,
+    val periods: List<PeriodSummary>
+)
+
+private fun hourlyCore(
+    forecast: CityForecast,
+    hourly: List<SimplifiedTimelinePoint>,
+    zone: ZoneId,
+    scope: OutlookScope,
+    maxFamilies: Int
+): HourlyCore {
     val hourlyPoints = hourly.filter { it.instant != null }
     val timestamps = hourlyPoints.mapNotNull(SimplifiedTimelinePoint::instant)
     val temperatureTraces = buildFamilyTemperatureTraces(forecast, timestamps, maxFamilies)
@@ -75,26 +158,10 @@ internal fun buildOverviewModel(
             isSnow = SkyKind.of(point.condition) == SkyKind.SNOW
         )
     }
-    val dailyPoints = daily.filter { it.date != null }
-    val periods = buildPeriodSummaries(hourlyPoints, precipitation, zone)
-    val solarEvent = nextSolarEvent(forecast, now, zone)
-
-    return OverviewModel(
+    return HourlyCore(
         hourly = hourlyPoints,
-        daily = dailyPoints,
-        agreement = agreementWording(
-            dailyPoints.firstOrNull()?.consensusLevel ?: hourlyPoints.firstOrNull()?.consensusLevel
-        ),
-        temperatureTraces = temperatureTraces,
+        traces = temperatureTraces,
         precipitation = precipitation,
-        periods = periods,
-        narrative = buildOverviewNarrative(
-            periods = periods,
-            precipitation = precipitation,
-            daily = dailyPoints,
-            today = now.atZone(zone).toLocalDate(),
-            solarEvent = solarEvent
-        ),
-        solarEvent = solarEvent
+        periods = buildPeriodSummaries(hourlyPoints, precipitation, zone, scope)
     )
 }

@@ -995,11 +995,9 @@ Daten</string>
     <string name="overview_why">Warum?</string>
     <string name="overview_hourly_a11y">Nächste Stunden: Höchstwert %1$s gegen %2$s, Tiefstwert %3$s gegen %4$s.</string>
     <string name="overview_hourly_spread_a11y">Die Modellfamilien weichen um bis zu %1$s voneinander ab.</string>
-    <string name="overview_daily_high_range_a11y">Vorhergesagte Höchstwerte je nach Modell zwischen %1$s und %2$s</string>
     <string name="overview_daily_rain_models">%1$d/%2$d</string>
     <string name="overview_daily_rain_models_a11y">%1$d von %2$d Modellen zeigen Regen</string>
     <string name="overview_percent">%1$d%%</string>
-    <string name="overview_wind">Wind %1$s</string>
     <string name="overview_right_now_title">Jetzt</string>
     <string name="overview_more">Mehr</string>
     <string name="overview_less">Weniger</string>
@@ -1058,8 +1056,6 @@ Daten</string>
     <string name="overview_narrative_tomorrow_much_cooler">Morgen wird es deutlich kühler.</string>
     <string name="overview_narrative_sunset">Sonnenuntergang um %1$s.</string>
     <string name="overview_narrative_sunrise">Sonnenaufgang um %1$s.</string>
-    <string name="overview_daily_wind_gusts">Wind %1$s, Böen %2$s</string>
-    <string name="overview_daily_rain_amount">Erwarteter Regen: %1$s</string>
     <string name="overview_rain_chance_a11y">%1$d%% Regenwahrscheinlichkeit</string>
     <string name="overview_model_details_title">Modelldetails</string>
     <string name="overview_model_details_subtitle">Jedes Modell, lokale Zuverlässigkeit, Diagramme und Engines</string>
@@ -1073,4 +1069,9 @@ Daten</string>
     <string name="manage_cities_remove_a11y">%1$s entfernen</string>
     <string name="manage_cities_move_up">%1$s nach oben</string>
     <string name="manage_cities_move_down">%1$s nach unten</string>
+    <string name="overview_narrative_sky_all_day">%1$s den ganzen Tag.</string>
+    <string name="overview_when_in_the_morning">am Morgen</string>
+    <string name="overview_when_in_the_afternoon">am Nachmittag</string>
+    <string name="overview_when_in_the_evening">am Abend</string>
+    <string name="overview_daily_models_range_a11y">Andere Vorhersagen reichen von %1$s bis %2$s</string>
 </resources>

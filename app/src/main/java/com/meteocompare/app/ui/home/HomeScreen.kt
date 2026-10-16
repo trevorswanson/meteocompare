@@ -60,8 +60,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meteocompare.app.R
+import com.meteocompare.app.core.util.resolveZoneOrUtc
 import com.meteocompare.app.domain.model.City
+import com.meteocompare.app.domain.model.CityForecast
 import com.meteocompare.app.domain.model.ForecastDisplayHorizon
+import com.meteocompare.app.domain.model.ForecastEngineContext
 import com.meteocompare.app.domain.model.UvForecast
 import com.meteocompare.app.domain.util.forecastIsNightAt
 import com.meteocompare.app.domain.util.forecastSolarWindow
@@ -71,7 +74,9 @@ import com.meteocompare.app.ui.citydetail.DisplayMode
 import com.meteocompare.app.ui.citydetail.RefreshFeedback
 import com.meteocompare.app.ui.citydetail.buildSimplifiedTimeline
 import com.meteocompare.app.ui.citydetail.cityLocalDate
+import com.meteocompare.app.ui.citydetail.overview.DayOutlook
 import com.meteocompare.app.ui.citydetail.overview.OverviewContent
+import com.meteocompare.app.ui.citydetail.overview.buildDayOutlook
 import com.meteocompare.app.ui.citydetail.overview.buildOverviewModel
 import com.meteocompare.app.ui.citylist.AddCitySheet
 import com.meteocompare.app.ui.citylist.EmptyState
@@ -81,6 +86,7 @@ import com.meteocompare.app.ui.components.OpenMeteoAttribution
 import com.meteocompare.app.ui.components.rememberAppToastDispatcher
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.map
+import java.time.LocalDate
 
 /**
  * Entrée de l'application : ouvre la dernière ville consultée (ou la
@@ -339,6 +345,9 @@ private fun HomeOverviewList(
         )
     }
     val model = remember(forecast, hourly, daily, now) { buildOverviewModel(forecast, hourly, daily, now) }
+    val dayOutlookFor: (LocalDate) -> DayOutlook? = remember(forecast, engineSignature) {
+        { date -> buildDayOutlookFor(forecast, engineContext, date) }
+    }
     val today = remember(forecast.city.timezone, now) { cityLocalDate(forecast.city.timezone, now) }
     val solarWindow = remember(forecast, today) { forecastSolarWindow(forecast, today) }
     val isNight = remember(forecast, now) { forecastIsNightAt(forecast, now) == true }
@@ -363,7 +372,8 @@ private fun HomeOverviewList(
                     uvIndex = uvForecast?.at(now),
                     solarWindow = solarWindow,
                     onWhyClick = { onConfidenceClick(today.toString()) },
-                    onModelDetailsClick = onModelDetailsClick
+                    onModelDetailsClick = onModelDetailsClick,
+                    dayOutlookFor = dayOutlookFor
                 )
             }
             item("attribution") {
@@ -496,3 +506,21 @@ internal const val TAG_HOME_ADD_CITY = "home_add_city"
 internal const val TAG_HOME_MANAGE_CITIES = "home_manage_cities"
 internal const val TAG_HOME_SETTINGS = "home_settings"
 internal const val TAG_HOME_RADAR = "home_radar"
+
+/** Journée [date] de minuit à minuit, avec le même moteur que l'aperçu ; null si trop peu de données. */
+private fun buildDayOutlookFor(
+    forecast: CityForecast,
+    engineContext: ForecastEngineContext,
+    date: LocalDate
+): DayOutlook? {
+    val midnight = date.atStartOfDay(resolveZoneOrUtc(forecast.city.timezone)).toInstant()
+    val hourly = buildSimplifiedTimeline(
+        forecast = forecast,
+        mode = DisplayMode.HOURLY,
+        now = midnight,
+        engineContext = engineContext,
+        // 25 h couvre les journées de changement d'heure ; la journée est filtrée ensuite.
+        hourlyHorizonHours = 25
+    )
+    return buildDayOutlook(forecast, date, hourly).takeIf { it.hourly.size >= 2 }
+}

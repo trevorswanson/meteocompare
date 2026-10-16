@@ -50,6 +50,9 @@ internal fun periodPhraseRes(phrase: PeriodPhrase): Int = when (phrase) {
     PeriodPhrase.TOMORROW_MORNING -> R.string.overview_when_tomorrow_morning
     PeriodPhrase.TOMORROW_AFTERNOON -> R.string.overview_when_tomorrow_afternoon
     PeriodPhrase.TOMORROW_EVENING -> R.string.overview_when_tomorrow_evening
+    PeriodPhrase.IN_THE_MORNING -> R.string.overview_when_in_the_morning
+    PeriodPhrase.IN_THE_AFTERNOON -> R.string.overview_when_in_the_afternoon
+    PeriodPhrase.IN_THE_EVENING -> R.string.overview_when_in_the_evening
 }
 
 @StringRes
@@ -87,7 +90,13 @@ internal fun narrativeText(sentences: List<NarrativeSentence>, timezone: String?
                 val then = sentence.then
                 val thenWhen = sentence.thenWhen
                 if (then == null || thenWhen == null) {
-                    stringResource(R.string.overview_narrative_sky_throughout, stringResource(skyStartRes(sentence.first)))
+                    stringResource(
+                        when (sentence.scope) {
+                            OutlookScope.NEXT_24_HOURS -> R.string.overview_narrative_sky_throughout
+                            OutlookScope.SINGLE_DAY -> R.string.overview_narrative_sky_all_day
+                        },
+                        stringResource(skyStartRes(sentence.first))
+                    )
                 } else {
                     stringResource(
                         R.string.overview_narrative_sky_then,

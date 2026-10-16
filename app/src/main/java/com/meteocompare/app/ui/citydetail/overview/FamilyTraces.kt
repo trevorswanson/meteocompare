@@ -6,6 +6,7 @@ import com.meteocompare.app.domain.model.HourlyForecast
 import com.meteocompare.app.domain.model.WeatherModel
 import com.meteocompare.app.domain.usecase.ForecastConsensus
 import java.time.Instant
+import java.time.LocalDate
 import kotlin.math.max
 
 /**
@@ -130,4 +131,44 @@ internal fun maxFamilySpread(traces: List<FamilyTrace>): Double? {
         best = max(best ?: spread, spread)
     }
     return best
+}
+
+/** Étendue des températures d'une journée entre lignées : plus basse minimale → plus haute maximale. */
+internal data class DailyFamilyRange(val low: Double, val high: Double)
+
+/**
+ * Pour chaque jour, minimale et maximale de chaque lignée (médiane de ses
+ * variantes, comme les courbes horaires), puis l'enveloppe entre lignées.
+ * Une seule lignée suffit à donner une étendue (égale à sa propre valeur).
+ */
+internal fun buildDailyFamilyRanges(forecast: CityForecast): Map<LocalDate, DailyFamilyRange> {
+    data class DayValues(val lows: MutableList<ForecastConsensus.Entry<Double>>, val highs: MutableList<ForecastConsensus.Entry<Double>>)
+
+    val byGroupAndDate = mutableMapOf<ForecastConsensus.Group, MutableMap<LocalDate, DayValues>>()
+    forecast.seriesByModel.forEach { (model, series) ->
+        val group = ForecastConsensus.groupFor(model)
+        series.daily.dates.forEachIndexed { index, date ->
+            val (max, min) = ForecastPhysicalLimits.dailyTemperaturePair(
+                series.daily.tempMax.getOrNull(index),
+                series.daily.tempMin.getOrNull(index)
+            )
+            val values = byGroupAndDate.getOrPut(group) { mutableMapOf() }
+                .getOrPut(date) { DayValues(mutableListOf(), mutableListOf()) }
+            min?.let { values.lows += ForecastConsensus.Entry(model, it) }
+            max?.let { values.highs += ForecastConsensus.Entry(model, it) }
+        }
+    }
+
+    val result = mutableMapOf<LocalDate, DailyFamilyRange>()
+    byGroupAndDate.values.forEach { dates ->
+        dates.forEach { (date, values) ->
+            val low = familyValue(values.lows)
+            val high = familyValue(values.highs)
+            val current = result[date]
+            val newLow = listOfNotNull(current?.low, low, high).minOrNull() ?: return@forEach
+            val newHigh = listOfNotNull(current?.high, high, low).maxOrNull() ?: return@forEach
+            result[date] = DailyFamilyRange(newLow, newHigh)
+        }
+    }
+    return result
 }

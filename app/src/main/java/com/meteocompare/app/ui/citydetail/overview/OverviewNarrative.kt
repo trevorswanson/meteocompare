@@ -20,7 +20,8 @@ internal sealed interface NarrativeSentence {
         val first: SkyKind,
         val firstWhen: PeriodPhrase,
         val then: SkyKind? = null,
-        val thenWhen: PeriodPhrase? = null
+        val thenWhen: PeriodPhrase? = null,
+        val scope: OutlookScope = OutlookScope.NEXT_24_HOURS
     ) : NarrativeSentence {
         /** Une seule catégorie sur toute la fenêtre. */
         val throughout: Boolean get() = then == null
@@ -62,20 +63,24 @@ internal fun buildOverviewNarrative(
     precipitation: List<OverviewPrecipHour>,
     daily: List<SimplifiedTimelinePoint>,
     today: LocalDate,
-    solarEvent: SolarEvent?
+    solarEvent: SolarEvent?,
+    scope: OutlookScope = OutlookScope.NEXT_24_HOURS
 ): List<NarrativeSentence> = listOfNotNull(
-    skySentence(periods),
-    rainStartSentence(precipitation),
-    tomorrowTrend(daily, today),
+    skySentence(periods, scope),
+    rainStartSentence(precipitation, scope),
+    // « Demain » n'a de sens que pour les 24 prochaines heures.
+    if (scope == OutlookScope.NEXT_24_HOURS) tomorrowTrend(daily, today) else null,
     solarEvent?.let(NarrativeSentence::Solar)
 )
 
-private fun skySentence(periods: List<PeriodSummary>): NarrativeSentence.Sky? {
+private fun skySentence(periods: List<PeriodSummary>, scope: OutlookScope): NarrativeSentence.Sky? {
     // Une première tranche d'une seule heure décrit « maintenant », déjà
     // affiché au-dessus : on commence à la tranche suivante quand elle existe.
     val usable = periods
         .filter { it.sky != null }
-        .let { list -> if (list.size > 1 && list.first().hourCount < 2) list.drop(1) else list }
+        .let { list ->
+            if (scope == OutlookScope.NEXT_24_HOURS && list.size > 1 && list.first().hourCount < 2) list.drop(1) else list
+        }
     if (usable.isEmpty()) return null
 
     val segments = mutableListOf<PeriodSummary>()
@@ -88,14 +93,16 @@ private fun skySentence(periods: List<PeriodSummary>): NarrativeSentence.Sky? {
         first = requireNotNull(first.sky),
         firstWhen = first.phrase,
         then = second?.sky,
-        thenWhen = second?.phrase
+        thenWhen = second?.phrase,
+        scope = scope
     )
 }
 
-private fun rainStartSentence(hours: List<OverviewPrecipHour>): NarrativeSentence.RainStart? {
+private fun rainStartSentence(hours: List<OverviewPrecipHour>, scope: OutlookScope): NarrativeSentence.RainStart? {
     val firstWet = hours.indexOfFirst(OverviewPrecipHour::isWet)
+    if (firstWet < 0) return null
     // Pluie dès maintenant : la phrase de ciel et « Maintenant » la disent déjà.
-    if (firstWet <= 0) return null
+    if (firstWet == 0 && scope == OutlookScope.NEXT_24_HOURS) return null
     val hour = hours[firstWet]
     val likelihood = when (hour.wording) {
         RainLikelihoodWording.CHANCE -> {

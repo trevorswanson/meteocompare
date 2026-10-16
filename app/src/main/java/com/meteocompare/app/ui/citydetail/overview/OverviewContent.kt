@@ -31,6 +31,7 @@ import com.meteocompare.app.core.units.WeatherUnits
 import com.meteocompare.app.domain.model.WeatherCondition
 import com.meteocompare.app.domain.util.ForecastSolarWindow
 import java.time.Instant
+import java.time.LocalDate
 
 /**
  * Aperçu simple d'une ville : « Maintenant », « Prochaines 24 heures »,
@@ -51,6 +52,7 @@ internal fun OverviewContent(
     onWhyClick: () -> Unit,
     modifier: Modifier = Modifier,
     onModelDetailsClick: (() -> Unit)? = null,
+    dayOutlookFor: (LocalDate) -> DayOutlook? = { null },
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     Column(
@@ -93,7 +95,14 @@ internal fun OverviewContent(
         if (model.daily.isNotEmpty()) {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 OverviewSectionTitle(stringResource(R.string.overview_next_days_title))
-                DailyOutlook(days = model.daily, units = units)
+                DailyOutlook(
+                    days = model.daily,
+                    ranges = model.dailyRanges,
+                    timezone = timezone,
+                    now = now,
+                    dayOutlookFor = dayOutlookFor,
+                    units = units
+                )
             }
         }
 

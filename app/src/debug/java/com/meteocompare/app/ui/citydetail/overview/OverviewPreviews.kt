@@ -93,7 +93,7 @@ private fun OverviewComponentsPreview() {
                 timezone = PreviewFixtures.city.timezone,
                 now = PreviewFixtures.now
             )
-            DailyOutlook(days = model.daily)
+            DailyOutlook(days = model.daily, ranges = model.dailyRanges, timezone = PreviewFixtures.city.timezone, now = PreviewFixtures.now)
         }
     }
 }

@@ -52,23 +52,34 @@ import com.meteocompare.app.core.units.WeatherUnits
 import com.meteocompare.app.ui.citydetail.SimplifiedTimelinePoint
 import com.meteocompare.app.ui.components.AnimatedWeatherIcon
 import com.meteocompare.app.ui.theme.precipitationMetricAccent
+import java.time.Instant
+import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
 /**
  * Prochains jours : nom du jour et signal pluie, icône, minimale, barre
- * min → max sur une échelle commune, maximale. Une ligne se déplie pour le
- * vent, la pluie et l'étendue des maximales entre modèles.
+ * min → max sur une échelle commune, maximale. Derrière la barre principale,
+ * une barre estompée couvre l'étendue des autres lignées de modèles.
+ *
+ * Une ligne dépliée affiche une version courte des « Prochaines 24 heures »
+ * pour cette journée, de minuit à minuit, calculée seulement à l'ouverture
+ * via [dayOutlookFor].
  */
 @Composable
 internal fun DailyOutlook(
     days: List<SimplifiedTimelinePoint>,
     modifier: Modifier = Modifier,
+    ranges: Map<LocalDate, DailyFamilyRange> = emptyMap(),
+    timezone: String? = null,
+    now: Instant? = null,
+    dayOutlookFor: (LocalDate) -> DayOutlook? = { null },
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     val rows = days.filter { it.date != null && it.tempMinC != null && it.tempMaxC != null }
     if (rows.isEmpty()) return
-    val scaleMin = rows.minOf { requireNotNull(it.tempMinC) }
-    val scaleMax = rows.maxOf { requireNotNull(it.tempMaxC) }
+    val rowRanges = rows.mapNotNull { day -> ranges[day.date] }
+    val scaleMin = minOf(rows.minOf { requireNotNull(it.tempMinC) }, rowRanges.minOfOrNull { it.low } ?: Double.MAX_VALUE)
+    val scaleMax = maxOf(rows.maxOf { requireNotNull(it.tempMaxC) }, rowRanges.maxOfOrNull { it.high } ?: -Double.MAX_VALUE)
     val span = (scaleMax - scaleMin).coerceAtLeast(1.0)
 
     Column(modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_DAILY)) {
@@ -76,7 +87,17 @@ internal fun DailyOutlook(
             if (index > 0) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
             }
-            DailyOutlookRow(day = day, isToday = index == 0, scaleMin = scaleMin, span = span, units = units)
+            DailyOutlookRow(
+                day = day,
+                range = ranges[day.date],
+                isToday = index == 0,
+                scaleMin = scaleMin,
+                span = span,
+                timezone = timezone,
+                now = now,
+                dayOutlookFor = dayOutlookFor,
+                units = units
+            )
         }
     }
 }
@@ -84,9 +105,13 @@ internal fun DailyOutlook(
 @Composable
 private fun DailyOutlookRow(
     day: SimplifiedTimelinePoint,
+    range: DailyFamilyRange?,
     isToday: Boolean,
     scaleMin: Double,
     span: Double,
+    timezone: String?,
+    now: Instant?,
+    dayOutlookFor: (LocalDate) -> DayOutlook?,
     units: WeatherUnits
 ) {
     val locale = LocalConfiguration.current.locales[0]
@@ -104,15 +129,30 @@ private fun DailyOutlookRow(
     val rainText = dailyRainText(day)
     val rainA11y = dailyRainA11y(day)
     val highLow = stringResource(R.string.overview_high_low, units.temp(high, locale = locale), units.temp(low, locale = locale))
-    val description = listOfNotNull(dayLabel, conditionLabel, highLow, rainA11y).joinToString(". ")
+    // L'étendue n'est mentionnée que si elle dépasse la barre principale.
+    val envelope = range?.takeIf {
+        !units.sameDisplayedValue(minOf(it.low, low), low, WeatherUnit.TEMPERATURE_COMPACT, locale = locale) ||
+            !units.sameDisplayedValue(maxOf(it.high, high), high, WeatherUnit.TEMPERATURE_COMPACT, locale = locale)
+    }
+    val rangeA11y = envelope?.let {
+        stringResource(
+            R.string.overview_daily_models_range_a11y,
+            units.temp(minOf(it.low, low), locale = locale),
+            units.temp(maxOf(it.high, high), locale = locale)
+        )
+    }
+    val description = listOfNotNull(dayLabel, conditionLabel, highLow, rangeA11y, rainA11y).joinToString(". ")
     val stateLabel = stringResource(if (expanded) R.string.section_state_expanded else R.string.section_state_collapsed)
     val pillColor = MaterialTheme.colorScheme.onSurface
+    // Même teinte estompée que les lignes « autres modèles » de la courbe horaire.
+    val envelopeColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OTHER_MODELS_ALPHA)
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 60.dp)
+                .testTag("$TAG_OVERVIEW_DAY_ROW$date")
                 .clickable(role = Role.Button) { expanded = !expanded }
                 .semantics(mergeDescendants = true) {
                     contentDescription = description
@@ -153,8 +193,11 @@ private fun DailyOutlookRow(
                     .clearAndSetSemantics { }
             ) {
                 val track = (maxWidth - LabelSlot * 2).coerceAtLeast(24.dp)
-                val start = LabelSlot + track * ((low - scaleMin) / span).toFloat()
-                val end = (LabelSlot + track * ((high - scaleMin) / span).toFloat()).coerceAtLeast(start + PillHeight)
+                fun xOf(value: Double) = LabelSlot + track * ((value - scaleMin) / span).toFloat()
+                val start = xOf(low)
+                val end = xOf(high).coerceAtLeast(start + PillHeight)
+                val envelopeStart = envelope?.let { minOf(xOf(it.low), start) } ?: start
+                val envelopeEnd = envelope?.let { maxOf(xOf(it.high), end) } ?: end
                 Text(
                     text = units.temp(low, locale = locale),
                     style = MaterialTheme.typography.titleMedium,
@@ -162,9 +205,25 @@ private fun DailyOutlookRow(
                     maxLines = 1,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .offset(x = start - LabelSlot)
+                        .offset(x = envelopeStart - LabelSlot)
                         .width(LabelSlot - 4.dp)
                 )
+                if (envelope != null) {
+                    Canvas(
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .offset(x = envelopeStart)
+                            .width(envelopeEnd - envelopeStart)
+                            .height(PillHeight)
+                    ) {
+                        drawRoundRect(
+                            color = envelopeColor,
+                            topLeft = Offset.Zero,
+                            size = Size(size.width, size.height),
+                            cornerRadius = CornerRadius(size.height / 2f)
+                        )
+                    }
+                }
                 Canvas(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
@@ -186,7 +245,7 @@ private fun DailyOutlookRow(
                     maxLines = 1,
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .offset(x = end + 4.dp)
+                        .offset(x = envelopeEnd + 4.dp)
                         .width(LabelSlot - 4.dp)
                 )
             }
@@ -198,58 +257,52 @@ private fun DailyOutlookRow(
             )
         }
         AnimatedVisibility(visible = expanded) {
-            DailyDetails(day = day, conditionLabel = conditionLabel, units = units)
+            DayOutlookDetails(date = date, timezone = timezone, now = now, dayOutlookFor = dayOutlookFor, units = units)
         }
     }
 }
 
+/** Version courte des « Prochaines 24 heures » pour une journée, de minuit à minuit. */
 @Composable
-private fun DailyDetails(day: SimplifiedTimelinePoint, conditionLabel: String?, units: WeatherUnits) {
-    val locale = LocalConfiguration.current.locales[0]
-    val lines = buildList {
-        conditionLabel?.let { add(it) }
-        day.windKmh?.let { wind ->
-            val gust = day.windGustKmh?.takeIf { it > wind }
-            add(
-                if (gust != null) {
-                    stringResource(
-                        R.string.overview_daily_wind_gusts,
-                        units.speed(wind, locale),
-                        units.speed(gust, locale)
-                    )
-                } else {
-                    stringResource(R.string.overview_wind, units.speed(wind, locale))
-                }
-            )
-        }
-        (day.precipitationExpectedMm ?: day.precipitationMm)?.takeIf { it > 0.0 }?.let {
-            add(stringResource(R.string.overview_daily_rain_amount, units.rain(it, locale)))
-        }
-        val rangeLow = day.temperatureMinAcrossModels
-        val rangeHigh = day.temperatureMaxAcrossModels
-        if (rangeLow != null && rangeHigh != null &&
-            !units.sameDisplayedValue(rangeLow, rangeHigh, WeatherUnit.TEMPERATURE_COMPACT, locale = locale)
-        ) {
-            add(
-                stringResource(
-                    R.string.overview_daily_high_range_a11y,
-                    units.temp(rangeLow, locale = locale),
-                    units.temp(rangeHigh, locale = locale)
-                )
-            )
-        }
-    }
+private fun DayOutlookDetails(
+    date: LocalDate,
+    timezone: String?,
+    now: Instant?,
+    dayOutlookFor: (LocalDate) -> DayOutlook?,
+    units: WeatherUnits
+) {
+    // Calculé seulement quand la journée est dépliée.
+    val outlook = remember(date, dayOutlookFor) { dayOutlookFor(date) }
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(start = 72.dp, bottom = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(2.dp)
+            .padding(top = 4.dp, bottom = 16.dp)
+            .testTag("$TAG_OVERVIEW_DAY_DETAILS$date"),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        lines.forEach { line ->
+        if (outlook == null || outlook.hourly.size < 2) {
             Text(
-                text = line,
+                text = stringResource(R.string.chart_not_enough_data),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        } else {
+            val summary = narrativeText(outlook.narrative, timezone)
+            if (summary.isNotBlank()) {
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            HourlyOutlookChart(
+                points = outlook.hourly,
+                traces = outlook.temperatureTraces,
+                periods = outlook.periods,
+                timezone = timezone,
+                now = now,
+                showLegend = false,
+                units = units
             )
         }
     }
@@ -286,4 +339,9 @@ private const val DAILY_RAIN_DISPLAY_MIN_PERCENT = 20
 private val LabelSlot = 44.dp
 private val PillHeight = 12.dp
 
+/** Opacité des éléments « autres modèles » (lignes horaires et barres journalières). */
+internal const val OTHER_MODELS_ALPHA = 0.13f
+
 internal const val TAG_OVERVIEW_DAILY = "overview_daily"
+internal const val TAG_OVERVIEW_DAY_ROW = "overview_day_"
+internal const val TAG_OVERVIEW_DAY_DETAILS = "overview_day_details_"

@@ -19,6 +19,7 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
+import com.meteocompare.app.core.util.resolveZoneOrUtc
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.WeatherCondition
 import com.meteocompare.app.testutil.TestFixtures
@@ -28,6 +29,7 @@ import com.meteocompare.app.ui.theme.MeteoCompareTheme
 import org.junit.Assert.assertEquals
 import org.junit.Rule
 import org.junit.Test
+import java.time.LocalDate
 
 class OverviewSectionTest {
     @get:Rule val composeRule = createComposeRule()
@@ -42,7 +44,8 @@ class OverviewSectionTest {
     private fun render(
         onWhyClick: () -> Unit = {},
         onModelDetailsClick: (() -> Unit)? = null,
-        fontScale: Float? = null
+        fontScale: Float? = null,
+        dayOutlookFor: (LocalDate) -> DayOutlook? = { null }
     ) {
         val overview = model()
         composeRule.setContent {
@@ -69,7 +72,8 @@ class OverviewSectionTest {
                                 uvIndex = 3.0,
                                 solarWindow = null,
                                 onWhyClick = onWhyClick,
-                                onModelDetailsClick = onModelDetailsClick
+                                onModelDetailsClick = onModelDetailsClick,
+                                dayOutlookFor = dayOutlookFor
                             )
                         }
                     }
@@ -124,5 +128,30 @@ class OverviewSectionTest {
 
         composeRule.onNodeWithTag(TAG_OVERVIEW_DAILY).performScrollTo().assertIsDisplayed()
         composeRule.onNodeWithTag(TAG_OVERVIEW_MODEL_DETAILS).performScrollTo().assertIsDisplayed()
+    }
+
+    @Test
+    fun expanding_a_day_reveals_its_midnight_to_midnight_outlook() {
+        val forecast = TestFixtures.forecast()
+        val zone = resolveZoneOrUtc(forecast.city.timezone)
+        val tomorrow = TestFixtures.now.atZone(zone).toLocalDate().plusDays(1)
+        val requested = mutableListOf<LocalDate>()
+        render(dayOutlookFor = { date ->
+            requested += date
+            val hourly = buildSimplifiedTimeline(
+                forecast,
+                DisplayMode.HOURLY,
+                date.atStartOfDay(zone).toInstant(),
+                hourlyHorizonHours = 25
+            )
+            buildDayOutlook(forecast, date, hourly)
+        })
+
+        composeRule.onNodeWithTag("$TAG_OVERVIEW_DAY_DETAILS$tomorrow").assertDoesNotExist()
+        composeRule.onNodeWithTag("$TAG_OVERVIEW_DAY_ROW$tomorrow").performScrollTo().performClick()
+        composeRule.onNodeWithTag("$TAG_OVERVIEW_DAY_DETAILS$tomorrow").performScrollTo().assertIsDisplayed()
+
+        // La journée n'est calculée qu'à l'ouverture.
+        assertEquals(listOf(tomorrow), requested.distinct())
     }
 }

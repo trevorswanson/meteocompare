@@ -59,8 +59,16 @@ internal enum class PeriodPhrase {
     OVERNIGHT,
     TOMORROW_MORNING,
     TOMORROW_AFTERNOON,
-    TOMORROW_EVENING
+    TOMORROW_EVENING,
+
+    // Journée complète (minuit à minuit) : formulations sans « aujourd'hui/demain ».
+    IN_THE_MORNING,
+    IN_THE_AFTERNOON,
+    IN_THE_EVENING
 }
+
+/** Fenêtre décrite : les 24 prochaines heures, ou une journée civile entière. */
+internal enum class OutlookScope { NEXT_24_HOURS, SINGLE_DAY }
 
 /**
  * Une tranche de la fenêtre horaire.
@@ -88,7 +96,8 @@ internal data class PeriodSummary(
 internal fun buildPeriodSummaries(
     points: List<SimplifiedTimelinePoint>,
     precipitation: List<OverviewPrecipHour>,
-    zone: ZoneId
+    zone: ZoneId,
+    scope: OutlookScope = OutlookScope.NEXT_24_HOURS
 ): List<PeriodSummary> {
     val instants = points.map { it.instant ?: return emptyList() }
     if (instants.isEmpty()) return emptyList()
@@ -112,7 +121,10 @@ internal fun buildPeriodSummaries(
         val range = start until index
         result += PeriodSummary(
             period = key.period,
-            phrase = phraseFor(key.period, ChronoUnit.DAYS.between(today, key.date)),
+            phrase = when (scope) {
+                OutlookScope.NEXT_24_HOURS -> phraseFor(key.period, ChronoUnit.DAYS.between(today, key.date))
+                OutlookScope.SINGLE_DAY -> dayPhraseFor(key.period)
+            },
             startIndex = range.first,
             endIndex = range.last,
             sky = dominantSky(range.map { SkyKind.of(points[it].condition) }),
@@ -128,6 +140,13 @@ private fun phraseFor(period: DayPeriod, dayOffset: Long): PeriodPhrase = when (
     DayPeriod.MORNING -> if (dayOffset <= 0) PeriodPhrase.THIS_MORNING else PeriodPhrase.TOMORROW_MORNING
     DayPeriod.AFTERNOON -> if (dayOffset <= 0) PeriodPhrase.THIS_AFTERNOON else PeriodPhrase.TOMORROW_AFTERNOON
     DayPeriod.EVENING -> if (dayOffset <= 0) PeriodPhrase.THIS_EVENING else PeriodPhrase.TOMORROW_EVENING
+}
+
+private fun dayPhraseFor(period: DayPeriod): PeriodPhrase = when (period) {
+    DayPeriod.OVERNIGHT -> PeriodPhrase.OVERNIGHT
+    DayPeriod.MORNING -> PeriodPhrase.IN_THE_MORNING
+    DayPeriod.AFTERNOON -> PeriodPhrase.IN_THE_AFTERNOON
+    DayPeriod.EVENING -> PeriodPhrase.IN_THE_EVENING
 }
 
 /**

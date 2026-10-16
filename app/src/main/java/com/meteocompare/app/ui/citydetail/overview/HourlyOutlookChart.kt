@@ -80,8 +80,9 @@ internal fun HourlyOutlookChart(
     traces: List<FamilyTrace>,
     periods: List<PeriodSummary>,
     timezone: String?,
-    now: Instant,
+    now: Instant?,
     modifier: Modifier = Modifier,
+    showLegend: Boolean = true,
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     val main = points.map { metricPlotValue(it.temperatureC) }
@@ -115,14 +116,18 @@ internal fun HourlyOutlookChart(
     val marked = remember(points, zone) {
         points.indices.filter { index -> points[index].instant!!.atZone(zone).hour % 3 == 0 }
     }
-    val nowOffsetHours = (Duration.between(first, now).toMinutes() / 60f).coerceIn(0f, (points.size - 1).toFloat())
+    val last = requireNotNull(points.last().instant)
+    // Le repère « Maintenant » n'apparaît que si l'instant présent est dans la fenêtre.
+    val nowOffsetHours = now
+        ?.takeIf { !it.isBefore(first) && !it.isAfter(last.plusSeconds(3_599)) }
+        ?.let { (Duration.between(first, it).toMinutes() / 60f).coerceIn(0f, (points.size - 1).toFloat()) }
 
     val contentWidth = SidePadding * 2 + HourWidth * (points.size - 1)
     fun xAt(index: Float): Dp = SidePadding + HourWidth * index
     fun yAt(value: Double): Dp = PlotTop + PlotHeight * (1f - ((value - range.min) / range.span).toFloat())
 
     val lineColor = MaterialTheme.colorScheme.onSurface
-    val familyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.13f)
+    val familyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OTHER_MODELS_ALPHA)
     val separatorColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val nowColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
@@ -152,14 +157,16 @@ internal fun HourlyOutlookChart(
                     }
 
                     // Repère « Maintenant ».
-                    val nowX = x(nowOffsetHours)
-                    drawLine(
-                        color = nowColor,
-                        start = Offset(nowX, HeaderHeight.toPx()),
-                        end = Offset(nowX, (PlotTop + PlotHeight).toPx()),
-                        strokeWidth = 1.5.dp.toPx(),
-                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
-                    )
+                    if (nowOffsetHours != null) {
+                        val nowX = x(nowOffsetHours)
+                        drawLine(
+                            color = nowColor,
+                            start = Offset(nowX, HeaderHeight.toPx()),
+                            end = Offset(nowX, (PlotTop + PlotHeight).toPx()),
+                            strokeWidth = 1.5.dp.toPx(),
+                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                        )
+                    }
 
                     // Autres modèles : traits pâles et épais, lissés.
                     val familyStroke = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
@@ -223,16 +230,18 @@ internal fun HourlyOutlookChart(
                 }
 
                 // Axe horaire et « Maintenant ».
-                Text(
-                    text = stringResource(R.string.timeline_now),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = nowColor,
-                    textAlign = TextAlign.Center,
-                    maxLines = 1,
-                    modifier = Modifier
-                        .offset(x = xAt(nowOffsetHours) - LabelWidth / 2, y = PlotTop + PlotHeight + 4.dp)
-                        .width(LabelWidth)
-                )
+                if (nowOffsetHours != null) {
+                    Text(
+                        text = stringResource(R.string.timeline_now),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = nowColor,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier
+                            .offset(x = xAt(nowOffsetHours) - LabelWidth / 2, y = PlotTop + PlotHeight + 4.dp)
+                            .width(LabelWidth)
+                    )
+                }
                 marked.forEach { index ->
                     Text(
                         text = points[index].instant!!.atZone(zone).format(hourFormatter),
@@ -247,7 +256,7 @@ internal fun HourlyOutlookChart(
                 }
             }
         }
-        if (traces.size >= 2) {
+        if (showLegend && traces.size >= 2) {
             ChartLegend(lineColor = lineColor, familyColor = familyColor)
         }
     }

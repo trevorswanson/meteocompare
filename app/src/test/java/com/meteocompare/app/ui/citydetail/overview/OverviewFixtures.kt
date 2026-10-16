@@ -26,7 +26,13 @@ internal fun overviewHourly(
     cloudCover = List(timestamps.size) { 20 }
 )
 
-internal fun overviewForecast(vararg series: Pair<WeatherModel, HourlyForecast>): CityForecast =
+internal fun overviewForecast(
+    vararg series: Pair<WeatherModel, HourlyForecast>
+): CityForecast = overviewForecastWithDaily(series.map { (model, hourly) -> Triple(model, hourly, null) })
+
+internal fun overviewForecastWithDaily(
+    series: List<Triple<WeatherModel, HourlyForecast, DailyForecast?>>
+): CityForecast =
     CityForecast(
         city = City(
             id = "hartford",
@@ -36,11 +42,11 @@ internal fun overviewForecast(vararg series: Pair<WeatherModel, HourlyForecast>)
             longitude = -72.67,
             timezone = "UTC"
         ),
-        seriesByModel = series.associate { (model, hourly) ->
+        seriesByModel = series.associate { (model, hourly, daily) ->
             model to ForecastSeries(
                 model = model,
                 hourly = hourly,
-                daily = DailyForecast(
+                daily = daily ?: DailyForecast(
                     dates = emptyList(),
                     tempMax = emptyList(),
                     tempMin = emptyList(),
