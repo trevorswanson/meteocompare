@@ -1066,4 +1066,7 @@ dato</string>
     <string name="overview_rain_chance_a11y">%1$d%% di probabilità di pioggia</string>
     <string name="overview_model_details_title">Dettagli dei modelli</string>
     <string name="overview_model_details_subtitle">Ogni modello, affidabilità locale, grafici e motori</string>
+    <string name="home_city_picker_a11y">%1$s, cambia città</string>
+    <string name="home_add_city">Aggiungi una città</string>
+    <string name="home_manage_cities">Gestisci città</string>
 </resources>

@@ -1063,4 +1063,7 @@ Daten</string>
     <string name="overview_rain_chance_a11y">%1$d%% Regenwahrscheinlichkeit</string>
     <string name="overview_model_details_title">Modelldetails</string>
     <string name="overview_model_details_subtitle">Jedes Modell, lokale Zuverlässigkeit, Diagramme und Engines</string>
+    <string name="home_city_picker_a11y">%1$s, Ort wechseln</string>
+    <string name="home_add_city">Ort hinzufügen</string>
+    <string name="home_manage_cities">Orte verwalten</string>
 </resources>

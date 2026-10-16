@@ -12,11 +12,21 @@ object Destinations {
     const val HELP = "help"
     const val LOCALITY_COMPARE = "locality-compare"
 
+    // ─── Page principale (fork) : aperçu simple de la ville choisie ────────
+    // HOME choisit la ville à ouvrir (ou propose d'en ajouter une) ;
+    // HOME_CITY affiche l'aperçu. CITY_LIST devient « Gérer les villes ».
+    const val HOME = "home"
+    private const val HOME_CITY_BASE = "home"
+
     private const val CITY_DETAIL_BASE = "city"
     const val CITY_DETAIL_ARG = "cityId"
     const val CITY_DETAIL = "$CITY_DETAIL_BASE/{$CITY_DETAIL_ARG}"
 
     fun cityDetail(cityId: String): String = "$CITY_DETAIL_BASE/$cityId"
+
+    const val HOME_CITY = "$HOME_CITY_BASE/{$CITY_DETAIL_ARG}"
+
+    fun homeCity(cityId: String): String = "$HOME_CITY_BASE/$cityId"
 
     private const val ENGINE_COMPARISON_BASE = "engine-comparison"
     const val ENGINE_COMPARISON = "$ENGINE_COMPARISON_BASE/{$CITY_DETAIL_ARG}"

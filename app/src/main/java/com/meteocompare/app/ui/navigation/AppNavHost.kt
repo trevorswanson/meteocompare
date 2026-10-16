@@ -48,6 +48,8 @@ import com.meteocompare.app.R
 import com.meteocompare.app.ui.citydetail.CityDetailScreen
 import com.meteocompare.app.ui.citydetail.confidence.ConfidenceExplanationScreen
 import com.meteocompare.app.ui.citylist.CityListScreen
+import com.meteocompare.app.ui.home.HomeCityScreen
+import com.meteocompare.app.ui.home.HomeGateScreen
 import com.meteocompare.app.ui.citylist.CityListViewModel
 import com.meteocompare.app.ui.components.AppToastLayer
 import com.meteocompare.app.ui.enginecomparison.EngineComparisonScreen
@@ -93,11 +95,10 @@ fun AppNavHost() {
     AppToastLayer(
         modifier = Modifier.semantics { testTagsAsResourceId = true }
     ) {
-        AdaptiveNavigationContent(
-            phoneContent = { PhoneAppNavHost() },
-            tabletContent = { TabletAppNavHost() },
-            modifier = Modifier.fillMaxSize()
-        )
+        // Fork : une seule navigation, téléphone comme tablette, centrée sur
+        // l'aperçu simple. Les navigations historiques ci-dessous restent en
+        // place pour faciliter les fusions avec l'amont.
+        HomeAppNavHost()
     }
 }
 
@@ -489,5 +490,81 @@ private fun NavGraphBuilder.detailDestinations(
         )
     ) {
         ConfidenceExplanationScreen(onBack = { navController.popBackStack() })
+    }
+}
+
+/**
+ * Navigation du fork : la page principale est l'aperçu simple d'une ville,
+ * l'ancienne liste devient « Gérer les villes » et la fiche historique
+ * « Détails des modèles ».
+ */
+@Composable
+private fun HomeAppNavHost() {
+    val navController = rememberNavController()
+
+    NavHost(
+        navController = navController,
+        startDestination = Destinations.HOME
+    ) {
+        composable(Destinations.HOME) {
+            HomeGateScreen(
+                onOpenCity = navController::openHomeCity,
+                onSettingsClick = { navController.navigate(Destinations.SETTINGS) }
+            )
+        }
+
+        composable(
+            route = Destinations.HOME_CITY,
+            arguments = listOf(navArgument(Destinations.CITY_DETAIL_ARG) { type = NavType.StringType })
+        ) { backStackEntry ->
+            val cityId = backStackEntry.arguments?.getString(Destinations.CITY_DETAIL_ARG)
+                ?: return@composable
+            HomeCityScreen(
+                cityId = cityId,
+                onSelectCity = navController::openHomeCity,
+                onCityGone = { fallbackCityId ->
+                    if (fallbackCityId != null) {
+                        navController.openHomeCity(fallbackCityId)
+                    } else {
+                        navController.resetTo(Destinations.HOME)
+                    }
+                },
+                onManageCitiesClick = { navController.navigate(Destinations.CITY_LIST) },
+                onSettingsClick = { navController.navigate(Destinations.SETTINGS) },
+                onRadarClick = { navController.navigate(Destinations.radar(cityId)) },
+                onModelDetailsClick = { navController.navigate(Destinations.cityDetail(cityId)) },
+                onConfidenceClick = { isoDate ->
+                    navController.navigate(Destinations.confidence(cityId, isoDate))
+                }
+            )
+        }
+
+        composable(Destinations.CITY_LIST) {
+            CityListScreen(
+                onCityClick = navController::openHomeCity,
+                onGraphicViewClick = { cityId -> navController.navigate(Destinations.graphicView(cityId)) },
+                onRadarClick = { cityId -> navController.navigate(Destinations.radar(cityId)) },
+                onSettingsClick = { navController.navigate(Destinations.SETTINGS) },
+                onHelpClick = { navController.navigate(Destinations.HELP) },
+                onCompareClick = { navController.navigate(Destinations.LOCALITY_COMPARE) }
+            )
+        }
+
+        commonFullScreenDestinations(navController)
+        detailDestinations(
+            navController = navController,
+            showDetailBackButton = true
+        )
+    }
+}
+
+/** La ville affichée devient l'unique racine : « retour » quitte l'application. */
+private fun NavHostController.openHomeCity(cityId: String) = resetTo(Destinations.homeCity(cityId))
+
+private fun NavHostController.resetTo(route: String) {
+    val rootId = graph.id
+    navigate(route) {
+        popUpTo(rootId) { inclusive = true }
+        launchSingleTop = true
     }
 }
