@@ -123,6 +123,19 @@ class CityRepositoryImpl @Inject constructor(
         Unit
     }
 
+    override suspend fun reorderFavorites(orderedIds: List<String>) = withContext(ioDispatcher) {
+        context.favoritesDataStore.edit { prefs ->
+            val current = prefs[FAVORITES_KEY]
+                ?.let { runCatching { json.decodeFromString(cityListSerializer, it) }.getOrDefault(emptyList()) }
+                ?: emptyList()
+            prefs[FAVORITES_KEY] = json.encodeToString(
+                cityListSerializer,
+                com.meteocompare.app.domain.util.reorderFavorites(current, orderedIds)
+            )
+        }
+        Unit
+    }
+
     override suspend fun setMarineEnabled(cityId: String, enabled: Boolean) = withContext(ioDispatcher) {
         context.favoritesDataStore.edit { prefs ->
             val current = prefs[FAVORITES_KEY]

@@ -1083,4 +1083,11 @@
     <string name="home_city_picker_a11y">%1$s, change city</string>
     <string name="home_add_city">Add a city</string>
     <string name="home_manage_cities">Manage cities</string>
+    <string name="manage_cities_empty">No saved cities. Add one from the title of the main page.</string>
+    <string name="manage_cities_remove_title">Remove %1$s?</string>
+    <string name="manage_cities_remove_message">The city and its local data (history, notifications) will be removed.</string>
+    <string name="manage_cities_remove_confirm">Remove</string>
+    <string name="manage_cities_remove_a11y">Remove %1$s</string>
+    <string name="manage_cities_move_up">Move %1$s up</string>
+    <string name="manage_cities_move_down">Move %1$s down</string>
 </resources>

@@ -50,3 +50,17 @@ private fun HomeEmptyPreview() {
         )
     }
 }
+
+@MeteoScreenPreview
+@Composable
+private fun ManageCitiesPreview() {
+    MeteoPreviewSurface {
+        ManageCitiesContent(
+            state = ManageCitiesUiState(isLoaded = true, cities = listOf(PreviewFixtures.city, PreviewFixtures.coastalCity)),
+            onBack = {},
+            onMoveUp = {},
+            onMoveDown = {},
+            onRemove = {}
+        )
+    }
+}

@@ -14,8 +14,9 @@ object Destinations {
 
     // ─── Page principale (fork) : aperçu simple de la ville choisie ────────
     // HOME choisit la ville à ouvrir (ou propose d'en ajouter une) ;
-    // HOME_CITY affiche l'aperçu. CITY_LIST devient « Gérer les villes ».
+    // HOME_CITY affiche l'aperçu ; MANAGE_CITIES réordonne ou supprime les villes.
     const val HOME = "home"
+    const val MANAGE_CITIES = "manage-cities"
     private const val HOME_CITY_BASE = "home"
 
     private const val CITY_DETAIL_BASE = "city"

@@ -6,14 +6,12 @@ import androidx.compose.ui.test.assertIsSelected
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.v2.createAndroidComposeRule
-import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
-import androidx.test.espresso.Espresso
 import com.meteocompare.app.domain.model.ForecastEngine
 import com.meteocompare.app.testutil.FakeCityRepository
 import com.meteocompare.app.testutil.FakeClimateNormalsRepository
@@ -31,9 +29,6 @@ import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_MODEL_DETAILS
 import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_MORE
 import com.meteocompare.app.ui.citylist.TAG_ADD_CITY_RESULT
 import com.meteocompare.app.ui.citylist.TAG_ADD_CITY_SEARCH_FIELD
-import com.meteocompare.app.ui.citylist.TAG_CITY_CARD
-import com.meteocompare.app.ui.citylist.TAG_DONATE_BUTTON
-import com.meteocompare.app.ui.citylist.TAG_EMPTY_STATE
 import com.meteocompare.app.ui.home.TAG_HOME_ADD_CITY
 import com.meteocompare.app.ui.home.TAG_HOME_CITY_OPTION
 import com.meteocompare.app.ui.home.TAG_HOME_CITY_PICKER
@@ -42,6 +37,12 @@ import com.meteocompare.app.ui.home.TAG_HOME_LOADED
 import com.meteocompare.app.ui.home.TAG_HOME_MANAGE_CITIES
 import com.meteocompare.app.ui.home.TAG_HOME_RADAR
 import com.meteocompare.app.ui.home.TAG_HOME_SETTINGS
+import com.meteocompare.app.ui.home.TAG_MANAGE_BACK
+import com.meteocompare.app.ui.home.TAG_MANAGE_CONFIRM_REMOVE
+import com.meteocompare.app.ui.home.TAG_MANAGE_DOWN
+import com.meteocompare.app.ui.home.TAG_MANAGE_EMPTY
+import com.meteocompare.app.ui.home.TAG_MANAGE_REMOVE
+import com.meteocompare.app.ui.home.TAG_MANAGE_ROW
 import com.meteocompare.app.ui.radar.TAG_RADAR_STAGE
 import com.meteocompare.app.ui.settings.TAG_SETTINGS_BACK
 import com.meteocompare.app.ui.settings.TAG_SETTINGS_ENGINE
@@ -144,29 +145,22 @@ class MainActivityNavigationTest {
     }
 
     @Test
-    fun manage_cities_keeps_the_city_list_and_opens_a_city() {
+    fun manage_cities_reorders_saved_cities() {
         forecasts.setForecast(TestFixtures.lyon)
         openHomeWith(TestFixtures.paris, TestFixtures.lyon)
 
         composeRule.onNodeWithTag(TAG_HOME_CITY_PICKER).performClick()
         composeRule.onNodeWithTag(TAG_HOME_MANAGE_CITIES).performClick()
-        waitForTag("$TAG_CITY_CARD${TestFixtures.lyon.id}")
-        composeRule.onNodeWithTag("$TAG_CITY_CARD${TestFixtures.lyon.id}").performClick()
+        waitForTag("$TAG_MANAGE_ROW${TestFixtures.paris.id}")
+        composeRule.onNodeWithTag("$TAG_MANAGE_DOWN${TestFixtures.paris.id}").performClick()
 
-        waitForTag(TAG_HOME_LOADED)
-        composeRule.onNodeWithTag(TAG_HOME_CITY_PICKER).assert(hasText(TestFixtures.lyon.name))
-    }
-
-    @Test
-    fun manage_cities_still_offers_the_donation_dialog() {
-        openHomeWith(TestFixtures.paris)
-        composeRule.onNodeWithTag(TAG_HOME_CITY_PICKER).performClick()
-        composeRule.onNodeWithTag(TAG_HOME_MANAGE_CITIES).performClick()
-
-        composeRule.onNodeWithTag(TAG_DONATE_BUTTON).performClick()
-        composeRule.onNodeWithText(
-            composeRule.activity.getString(R.string.donations_dialog_title)
-        ).assertIsDisplayed()
+        runBlocking {
+            withTimeout(5_000) {
+                cities.observeFavorites().first { list ->
+                    list.map { it.id } == listOf(TestFixtures.lyon.id, TestFixtures.paris.id)
+                }
+            }
+        }
     }
 
     @Test
@@ -174,16 +168,12 @@ class MainActivityNavigationTest {
         openHomeWith(TestFixtures.paris)
         composeRule.onNodeWithTag(TAG_HOME_CITY_PICKER).performClick()
         composeRule.onNodeWithTag(TAG_HOME_MANAGE_CITIES).performClick()
-        waitForTag("$TAG_CITY_CARD${TestFixtures.paris.id}")
+        waitForTag("$TAG_MANAGE_ROW${TestFixtures.paris.id}")
 
-        composeRule.onNodeWithContentDescription(
-            composeRule.activity.getString(R.string.action_more_options),
-            useUnmergedTree = true
-        ).performClick()
-        composeRule.onNodeWithText(composeRule.activity.getString(R.string.action_remove_from_favorites))
-            .performClick()
-        composeRule.onNodeWithTag(TAG_EMPTY_STATE).assertIsDisplayed()
-        Espresso.pressBack()
+        composeRule.onNodeWithTag("$TAG_MANAGE_REMOVE${TestFixtures.paris.id}").performClick()
+        composeRule.onNodeWithTag(TAG_MANAGE_CONFIRM_REMOVE).performClick()
+        waitForTag(TAG_MANAGE_EMPTY)
+        composeRule.onNodeWithTag(TAG_MANAGE_BACK).performClick()
 
         waitForTag(TAG_HOME_EMPTY)
     }

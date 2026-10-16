@@ -18,6 +18,9 @@ interface CityRepository {
     /** Retire une ville des favoris. */
     suspend fun removeFavorite(cityId: String)
 
+    /** Réordonne les favoris (voir [com.meteocompare.app.domain.util.reorderFavorites]). */
+    suspend fun reorderFavorites(orderedIds: List<String>)
+
     /** Active/désactive le mode Mer / côte pour un favori existant. */
     suspend fun setMarineEnabled(cityId: String, enabled: Boolean)
 

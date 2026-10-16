@@ -1069,4 +1069,11 @@ dato</string>
     <string name="home_city_picker_a11y">%1$s, cambia città</string>
     <string name="home_add_city">Aggiungi una città</string>
     <string name="home_manage_cities">Gestisci città</string>
+    <string name="manage_cities_empty">Nessuna città salvata. Aggiungine una dal titolo della pagina principale.</string>
+    <string name="manage_cities_remove_title">Rimuovere %1$s?</string>
+    <string name="manage_cities_remove_message">La città e i suoi dati locali (cronologia, notifiche) verranno rimossi.</string>
+    <string name="manage_cities_remove_confirm">Rimuovi</string>
+    <string name="manage_cities_remove_a11y">Rimuovi %1$s</string>
+    <string name="manage_cities_move_up">Sposta su %1$s</string>
+    <string name="manage_cities_move_down">Sposta giù %1$s</string>
 </resources>

@@ -50,6 +50,7 @@ import com.meteocompare.app.ui.citydetail.confidence.ConfidenceExplanationScreen
 import com.meteocompare.app.ui.citylist.CityListScreen
 import com.meteocompare.app.ui.home.HomeCityScreen
 import com.meteocompare.app.ui.home.HomeGateScreen
+import com.meteocompare.app.ui.home.ManageCitiesScreen
 import com.meteocompare.app.ui.citylist.CityListViewModel
 import com.meteocompare.app.ui.components.AppToastLayer
 import com.meteocompare.app.ui.enginecomparison.EngineComparisonScreen
@@ -495,8 +496,8 @@ private fun NavGraphBuilder.detailDestinations(
 
 /**
  * Navigation du fork : la page principale est l'aperçu simple d'une ville,
- * l'ancienne liste devient « Gérer les villes » et la fiche historique
- * « Détails des modèles ».
+ * « Gérer les villes » réordonne ou supprime les villes et la fiche
+ * historique devient « Détails des modèles ».
  */
 @Composable
 private fun HomeAppNavHost() {
@@ -529,7 +530,7 @@ private fun HomeAppNavHost() {
                         navController.resetTo(Destinations.HOME)
                     }
                 },
-                onManageCitiesClick = { navController.navigate(Destinations.CITY_LIST) },
+                onManageCitiesClick = { navController.navigate(Destinations.MANAGE_CITIES) },
                 onSettingsClick = { navController.navigate(Destinations.SETTINGS) },
                 onRadarClick = { navController.navigate(Destinations.radar(cityId)) },
                 onModelDetailsClick = { navController.navigate(Destinations.cityDetail(cityId)) },
@@ -539,15 +540,8 @@ private fun HomeAppNavHost() {
             )
         }
 
-        composable(Destinations.CITY_LIST) {
-            CityListScreen(
-                onCityClick = navController::openHomeCity,
-                onGraphicViewClick = { cityId -> navController.navigate(Destinations.graphicView(cityId)) },
-                onRadarClick = { cityId -> navController.navigate(Destinations.radar(cityId)) },
-                onSettingsClick = { navController.navigate(Destinations.SETTINGS) },
-                onHelpClick = { navController.navigate(Destinations.HELP) },
-                onCompareClick = { navController.navigate(Destinations.LOCALITY_COMPARE) }
-            )
+        composable(Destinations.MANAGE_CITIES) {
+            ManageCitiesScreen(onBack = { navController.popBackStack() })
         }
 
         commonFullScreenDestinations(navController)

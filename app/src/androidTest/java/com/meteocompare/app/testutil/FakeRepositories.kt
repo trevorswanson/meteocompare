@@ -66,6 +66,10 @@ class FakeCityRepository @Inject constructor() : CityRepository {
         favorites.value = favorites.value.filterNot { it.id == cityId }
     }
 
+    override suspend fun reorderFavorites(orderedIds: List<String>) {
+        favorites.value = com.meteocompare.app.domain.util.reorderFavorites(favorites.value, orderedIds)
+    }
+
     override suspend fun setMarineEnabled(cityId: String, enabled: Boolean) {
         favorites.value = favorites.value.map { city ->
             if (city.id == cityId) city.copy(marineEnabled = enabled) else city

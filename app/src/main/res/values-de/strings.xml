@@ -1066,4 +1066,11 @@ Daten</string>
     <string name="home_city_picker_a11y">%1$s, Ort wechseln</string>
     <string name="home_add_city">Ort hinzufügen</string>
     <string name="home_manage_cities">Orte verwalten</string>
+    <string name="manage_cities_empty">Keine gespeicherten Orte. Füge einen über den Titel der Hauptseite hinzu.</string>
+    <string name="manage_cities_remove_title">%1$s entfernen?</string>
+    <string name="manage_cities_remove_message">Der Ort und seine lokalen Daten (Verlauf, Benachrichtigungen) werden entfernt.</string>
+    <string name="manage_cities_remove_confirm">Entfernen</string>
+    <string name="manage_cities_remove_a11y">%1$s entfernen</string>
+    <string name="manage_cities_move_up">%1$s nach oben</string>
+    <string name="manage_cities_move_down">%1$s nach unten</string>
 </resources>
