@@ -14,10 +14,18 @@ enum class ForecastEngine {
     ADAPTIVE;
 
     companion object {
+        /** Valeur par défaut des calculs internes (options V3, contextes, tests). */
         val DEFAULT: ForecastEngine = MULTI_CONSENSUS
 
-        fun fromString(raw: String?): ForecastEngine =
-            entries.firstOrNull { it.name == raw } ?: DEFAULT
+        /**
+         * Moteur appliqué tant que l'utilisateur n'en a pas choisi un. L'adaptatif
+         * retombe de lui-même sur le multi-consensus lorsque l'historique local
+         * de calibration est insuffisant.
+         */
+        val USER_DEFAULT: ForecastEngine = ADAPTIVE
+
+        fun fromString(raw: String?, fallback: ForecastEngine = DEFAULT): ForecastEngine =
+            entries.firstOrNull { it.name == raw } ?: fallback
     }
 }
 

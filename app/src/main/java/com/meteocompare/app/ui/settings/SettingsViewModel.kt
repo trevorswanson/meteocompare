@@ -121,7 +121,7 @@ class SettingsViewModel @Inject constructor(
         .stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = ForecastEngine.DEFAULT
+            initialValue = ForecastEngine.USER_DEFAULT
         )
 
     val notificationSettings: StateFlow<NotificationSettings> = prefs.observeNotificationSettings()

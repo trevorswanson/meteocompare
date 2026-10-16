@@ -176,7 +176,7 @@ class UserPreferencesRepositoryImpl @Inject constructor(
 
     override fun observeForecastEngine(): Flow<ForecastEngine> =
         safePreferences.map { prefs ->
-            ForecastEngine.fromString(prefs[FORECAST_ENGINE_KEY])
+            ForecastEngine.fromString(prefs[FORECAST_ENGINE_KEY], fallback = ForecastEngine.USER_DEFAULT)
         }.distinctUntilChanged()
 
     override suspend fun setForecastEngine(engine: ForecastEngine) =

@@ -278,6 +278,13 @@ class ForecastEngineV3Test {
         assertEquals(ForecastEngine.MULTI_CONSENSUS, ForecastEngine.fromString("UNKNOWN_ENGINE"))
         assertEquals(ForecastEngine.MULTI_CONSENSUS, ForecastEngine.fromString(null))
         assertNotEquals(ForecastEngine.CALIBRATION, ForecastEngine.fromString("calibration"))
+        // Sans choix enregistré, l'application utilise l'adaptatif ; les calculs
+        // internes gardent le multi-consensus comme valeur par défaut.
+        assertEquals(ForecastEngine.ADAPTIVE, ForecastEngine.fromString(null, ForecastEngine.USER_DEFAULT))
+        assertEquals(
+            ForecastEngine.SCENARIOS,
+            ForecastEngine.fromString("SCENARIOS", ForecastEngine.USER_DEFAULT)
+        )
     }
     @Test
     fun `scenario fifty fifty keeps both scenarios but central falls back to multi consensus`() {
