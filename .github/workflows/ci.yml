@@ -1,0 +1,91 @@
+name: CI
+
+# Tests and validation gates. Runs on pull requests and on pushes to any branch
+# other than master; release.yml reuses it before building a master release.
+on:
+  pull_request:
+  push:
+    branches-ignore:
+      - master
+  workflow_dispatch:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Tests, lint and validation gates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+          persist-credentials: false
+
+      # Checks that gradle-wrapper.jar is an official Gradle wrapper.
+      - name: Validate Gradle Wrapper
+        uses: gradle/actions/wrapper-validation@v6
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Make Gradle Wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Install Android SDK packages
+        run: .github/scripts/install-android-sdk.sh
+
+      - name: Repository validation gates
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/validate-compose-previews.py
+          python3 scripts/check_android_strings.py
+          scripts/validate-fdroid-metadata.sh
+          python3 -m unittest discover -s scripts/tests -p 'test_*.py' -v
+
+      # Unit tests, Hilt instrumentation build (catches missing bindings),
+      # lint, and an unsigned release build to exercise R8 shrinking.
+      - name: Unit tests, instrumentation build, lint and release build
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew \
+            --no-daemon \
+            -Dorg.gradle.jvmargs="-Xmx3g -Dfile.encoding=UTF-8" \
+            --stacktrace \
+            :app:testDebugUnitTest \
+            :app:testReleaseUnitTest \
+            :app:assembleDebugAndroidTest \
+            :app:lintDebug \
+            :app:assembleRelease
+
+      - name: Verify Android 16 KiB page-size compatibility
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="$(find app/build/outputs/apk/release -maxdepth 1 -type f -name "*.apk" -print -quit)"
+          test -n "$APK"
+          python3 scripts/verify-16kb-page-size.py --apk "$APK"
+
+      - name: Upload test and lint reports
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: reports-${{ github.run_number }}
+          path: |
+            app/build/reports/
+            app/build/test-results/
+          if-no-files-found: ignore
+          retention-days: 14

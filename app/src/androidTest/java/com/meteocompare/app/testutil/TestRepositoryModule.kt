@@ -7,6 +7,7 @@ import com.meteocompare.app.domain.repository.ClimateNormalsRepository
 import com.meteocompare.app.domain.repository.ForecastEvolutionRepository
 import com.meteocompare.app.domain.repository.ForecastRepository
 import com.meteocompare.app.domain.repository.MarineRepository
+import com.meteocompare.app.domain.repository.NextHourPrecipitationRepository
 import com.meteocompare.app.domain.repository.UserPreferencesRepository
 import com.meteocompare.app.domain.repository.UvIndexRepository
 import com.meteocompare.app.domain.repository.VigilanceRepository
@@ -45,6 +46,12 @@ object TestRepositoryModule {
     @Provides
     @Singleton
     fun uvIndexRepository(fake: FakeUvIndexRepository): UvIndexRepository = fake
+
+    @Provides
+    @Singleton
+    fun nextHourPrecipitationRepository(
+        fake: FakeNextHourPrecipitationRepository
+    ): NextHourPrecipitationRepository = fake
 
     @Provides
     @Singleton

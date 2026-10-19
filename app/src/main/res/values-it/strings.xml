@@ -991,11 +991,7 @@ dato</string>
     <string name="detail_solar_daylight">%1$d h %2$02d min di luce</string>
     <string name="overview_now_a11y">Attualmente %1$s</string>
     <string name="overview_high_low">Max %1$s · Min %2$s</string>
-    <string name="overview_agreement_agree">Le previsioni concordano</string>
-    <string name="overview_agreement_some">Previsioni in parte divergenti</string>
-    <string name="overview_agreement_disagree">Le previsioni divergono</string>
     <string name="overview_agreement_a11y">%1$s. Apri la spiegazione dettagliata</string>
-    <string name="overview_why">Perché?</string>
     <string name="overview_hourly_a11y">Prossime ore: massima %1$s verso le %2$s, minima %3$s verso le %4$s.</string>
     <string name="overview_hourly_spread_a11y">Le famiglie di modelli differiscono fino a %1$s.</string>
     <string name="overview_daily_rain_models">%1$d/%2$d</string>

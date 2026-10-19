@@ -27,14 +27,17 @@ class ReleaseReadinessTests(unittest.TestCase):
         self.assertIn('override suspend fun get(city: City)', fake.read_text(encoding='utf-8'))
 
     def test_release_workflow_compiles_android_instrumentation(self):
-        workflow = (ROOT / '.github/workflows/release-fdroid.yml').read_text(encoding='utf-8')
+        workflow = (ROOT / '.github/workflows/ci.yml').read_text(encoding='utf-8')
         self.assertIn(':app:assembleDebugAndroidTest', workflow)
         self.assertIn(':app:testDebugUnitTest', workflow)
         self.assertIn(':app:testReleaseUnitTest', workflow)
         self.assertIn('python3 scripts/check_android_strings.py', workflow)
         self.assertIn(':app:lintDebug', workflow)
         self.assertIn(':app:assembleRelease', workflow)
-        self.assertIn(':app:bundleRelease', workflow)
+        # Releases must not ship without the same checks.
+        release = (ROOT / '.github/workflows/release.yml').read_text(encoding='utf-8')
+        self.assertIn('uses: ./.github/workflows/ci.yml', release)
+        self.assertIn('needs: ci', release)
 
     def test_current_android_version_has_localized_release_notes(self):
         """Do not pin this guard to an older release number.

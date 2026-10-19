@@ -988,11 +988,7 @@ Daten</string>
     <string name="detail_solar_daylight">%1$d Std. %2$02d Min. Tageslicht</string>
     <string name="overview_now_a11y">Aktuell %1$s</string>
     <string name="overview_high_low">Max %1$s · Min %2$s</string>
-    <string name="overview_agreement_agree">Die Vorhersagen stimmen überein</string>
-    <string name="overview_agreement_some">Vorhersagen weichen teilweise ab</string>
-    <string name="overview_agreement_disagree">Die Vorhersagen weichen ab</string>
     <string name="overview_agreement_a11y">%1$s. Ausführliche Erklärung öffnen</string>
-    <string name="overview_why">Warum?</string>
     <string name="overview_hourly_a11y">Nächste Stunden: Höchstwert %1$s gegen %2$s, Tiefstwert %3$s gegen %4$s.</string>
     <string name="overview_hourly_spread_a11y">Die Modellfamilien weichen um bis zu %1$s voneinander ab.</string>
     <string name="overview_daily_rain_models">%1$d/%2$d</string>

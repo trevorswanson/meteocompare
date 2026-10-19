@@ -1005,11 +1005,7 @@
     <string name="detail_solar_daylight">%1$dh %2$02dm daylight</string>
     <string name="overview_now_a11y">Currently %1$s</string>
     <string name="overview_high_low">High %1$s · Low %2$s</string>
-    <string name="overview_agreement_agree">Forecasts agree</string>
-    <string name="overview_agreement_some">Forecasts partly disagree</string>
-    <string name="overview_agreement_disagree">Forecasts disagree</string>
     <string name="overview_agreement_a11y">%1$s. Open the detailed explanation</string>
-    <string name="overview_why">Why?</string>
     <string name="overview_hourly_a11y">Next hours: high %1$s around %2$s, low %3$s around %4$s.</string>
     <string name="overview_hourly_spread_a11y">Forecast families differ by up to %1$s.</string>
     <string name="overview_daily_rain_models">%1$d/%2$d</string>

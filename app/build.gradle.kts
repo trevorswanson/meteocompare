@@ -38,6 +38,15 @@ val vigilanceBaseUrl = providers.gradleProperty("VIGILANCE_BASE_URL")
     .let { value -> if (value.endsWith('/')) value else "$value/" }
     .also { value -> require(value.startsWith("https://")) { "VIGILANCE_BASE_URL must use HTTPS" } }
 
+// ─── Builds du fork (CI) ────────────────────────────────────────────────────
+//
+// `-PforkBuildNumber=N` (passé par .github/workflows/release.yml) produit un
+// build installable à côté de l'app officielle : identifiant suffixé `.fork`,
+// signé avec la clé du fork, et versionCode monotone au-delà de toute version
+// amont pour que chaque release s'installe comme une mise à jour.
+val forkBuildNumber = providers.gradleProperty("forkBuildNumber").orNull?.toInt()
+val forkVersionCodeBase = 100_000
+
 android {
     namespace = "com.meteocompare.app"
     compileSdk = libs.versions.compileSdk.get().toInt()
@@ -48,6 +57,10 @@ android {
         targetSdk = libs.versions.targetSdk.get().toInt()
         versionCode = 43
         versionName = "1.17.2"
+        forkBuildNumber?.let { build ->
+            versionCode = forkVersionCodeBase + build
+            versionName += "-fork.$build"
+        }
         testInstrumentationRunner = "com.meteocompare.app.HiltTestRunner"
         buildConfigField("String", "METEOCOMPARE_BASE_URL", "\"$vigilanceBaseUrl\"")
         vectorDrawables { useSupportLibrary = true }
@@ -67,6 +80,7 @@ android {
 
     buildTypes {
         release {
+            if (forkBuildNumber != null) applicationIdSuffix = ".fork"
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

@@ -1005,11 +1005,7 @@
     <string name="detail_solar_daylight">%1$d h %2$02d de jour</string>
     <string name="overview_now_a11y">Actuellement %1$s</string>
     <string name="overview_high_low">Max %1$s · Min %2$s</string>
-    <string name="overview_agreement_agree">Les prévisions concordent</string>
-    <string name="overview_agreement_some">Prévisions en partie divergentes</string>
-    <string name="overview_agreement_disagree">Les prévisions divergent</string>
     <string name="overview_agreement_a11y">%1$s. Ouvrir l’explication détaillée</string>
-    <string name="overview_why">Pourquoi ?</string>
     <string name="overview_hourly_a11y">Prochaines heures : maximum %1$s vers %2$s, minimum %3$s vers %4$s.</string>
     <string name="overview_hourly_spread_a11y">Les familles de modèles diffèrent au plus de %1$s.</string>
     <string name="overview_daily_rain_models">%1$d/%2$d</string>
