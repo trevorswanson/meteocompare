@@ -1043,7 +1043,7 @@
     <string name="overview_convergence_high">Modèles d’accord</string>
     <string name="overview_convergence_medium">Accord partiel</string>
     <string name="overview_convergence_low">Modèles divergents</string>
-    <string name="overview_next_days_title">Prochains jours</string>
+    <string name="overview_next_days_title">10 prochains jours</string>
     <string name="overview_when_this_morning">ce matin</string>
     <string name="overview_when_this_afternoon">cet après-midi</string>
     <string name="overview_when_this_evening">ce soir</string>

@@ -100,6 +100,8 @@ internal fun OverviewContent(
                     timezone = timezone,
                     now = now,
                     solarEvents = model.timelineSolarEvents,
+                    // La courbe commence maintenant : le repère serait toujours au bord gauche.
+                    showNow = false,
                     units = units
                 )
             }

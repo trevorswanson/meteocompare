@@ -4,7 +4,6 @@ import com.meteocompare.app.core.util.resolveZoneOrUtc
 import com.meteocompare.app.domain.model.CityForecast
 import com.meteocompare.app.domain.model.PrecipitationThresholds
 import com.meteocompare.app.ui.citydetail.SimplifiedTimelinePoint
-import com.meteocompare.app.domain.util.forecastSolarWindow
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -110,7 +109,6 @@ internal fun buildDayOutlook(
     val zone = resolveZoneOrUtc(forecast.city.timezone)
     val dayHourly = hourly.filter { it.instant?.atZone(zone)?.toLocalDate() == date }
     val core = hourlyCore(forecast, dayHourly, zone, OutlookScope.SINGLE_DAY, maxFamilies)
-    val sunset = forecastSolarWindow(forecast, date).sunset
     return DayOutlook(
         date = date,
         hourly = core.hourly,
@@ -121,7 +119,8 @@ internal fun buildDayOutlook(
             precipitation = core.precipitation,
             daily = emptyList(),
             today = date,
-            solarEvent = sunset?.let { SolarEvent(sunset = true, at = it) },
+            // Lever et coucher sont déjà sur la courbe du jour : pas de phrase.
+            solarEvent = null,
             scope = OutlookScope.SINGLE_DAY
         ),
         solarEvents = core.solarEvents

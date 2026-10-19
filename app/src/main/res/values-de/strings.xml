@@ -1026,7 +1026,7 @@ Daten</string>
     <string name="overview_convergence_high">Modelle einig</string>
     <string name="overview_convergence_medium">Teilweise einig</string>
     <string name="overview_convergence_low">Modelle uneinig</string>
-    <string name="overview_next_days_title">Nächste Tage</string>
+    <string name="overview_next_days_title">Nächste 10 Tage</string>
     <string name="overview_when_this_morning">heute Morgen</string>
     <string name="overview_when_this_afternoon">heute Nachmittag</string>
     <string name="overview_when_this_evening">heute Abend</string>

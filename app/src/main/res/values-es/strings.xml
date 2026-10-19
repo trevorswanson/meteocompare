@@ -1029,7 +1029,7 @@ datos</string>
     <string name="overview_convergence_high">Modelos de acuerdo</string>
     <string name="overview_convergence_medium">Acuerdo parcial</string>
     <string name="overview_convergence_low">Modelos en desacuerdo</string>
-    <string name="overview_next_days_title">Próximos días</string>
+    <string name="overview_next_days_title">Próximos 10 días</string>
     <string name="overview_when_this_morning">esta mañana</string>
     <string name="overview_when_this_afternoon">esta tarde</string>
     <string name="overview_when_this_evening">esta noche</string>

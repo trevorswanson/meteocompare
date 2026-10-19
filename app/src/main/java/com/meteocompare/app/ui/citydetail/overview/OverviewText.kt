@@ -8,8 +8,11 @@ import androidx.compose.ui.res.stringResource
 import com.meteocompare.app.R
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.locale.WeatherTimeFormat
+import com.meteocompare.app.core.units.WeatherUnit
+import com.meteocompare.app.core.units.WeatherUnits
 import com.meteocompare.app.ui.citydetail.resolveCityZone
 import java.time.Instant
+import java.util.Locale
 
 /** Catégorie de ciel en début de phrase (« Ciel dégagé »). */
 @StringRes
@@ -54,6 +57,14 @@ internal fun periodPhraseRes(phrase: PeriodPhrase): Int = when (phrase) {
     PeriodPhrase.IN_THE_AFTERNOON -> R.string.overview_when_in_the_afternoon
     PeriodPhrase.IN_THE_EVENING -> R.string.overview_when_in_the_evening
 }
+
+/**
+ * Température affichée sans unité (« 46° ») : sur les courbes et la liste des
+ * jours, l'unité choisie dans les réglages est implicite. Les descriptions
+ * TalkBack gardent l'unité complète.
+ */
+internal fun WeatherUnits.degrees(celsius: Double?, locale: Locale): String =
+    value(celsius, WeatherUnit.TEMPERATURE_COMPACT, 0, locale).let { if (it == "—") it else "$it°" }
 
 /** Signal pluie compact : pourcentage seulement s'il vient de probabilités natives. */
 @Composable

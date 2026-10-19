@@ -18,6 +18,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.WbSunny
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -32,10 +36,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
@@ -92,6 +98,8 @@ internal fun HourlyOutlookChart(
     now: Instant?,
     modifier: Modifier = Modifier,
     solarEvents: List<SolarEvent> = emptyList(),
+    /** Repère « Maintenant » ; inutile quand la courbe commence maintenant. */
+    showNow: Boolean = true,
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     val main = points.map { metricPlotValue(it.temperatureC) }
@@ -128,7 +136,7 @@ internal fun HourlyOutlookChart(
     fun hoursFromStart(instant: Instant): Float = Duration.between(first, instant).seconds / 3600f
     // Le repère « Maintenant » n'apparaît que si l'instant présent est dans la fenêtre.
     val nowOffsetHours = now
-        ?.takeIf { !it.isBefore(first) && !it.isAfter(last) }
+        ?.takeIf { showNow && !it.isBefore(first) && !it.isAfter(last) }
         ?.let { hoursFromStart(it).coerceIn(0f, lastIndex) }
     val visibleSolarEvents = remember(solarEvents, first, last) {
         solarEvents.filter { !it.at.isBefore(first) && !it.at.isAfter(last) }
@@ -137,13 +145,20 @@ internal fun HourlyOutlookChart(
         nightRanges(first, last, points.first().isNight == true, solarEvents)
     }
 
-    val lineColor = MaterialTheme.colorScheme.onSurface
-    val familyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OTHER_MODELS_ALPHA)
-    val nowColor = MaterialTheme.colorScheme.primary
+    val textColor = MaterialTheme.colorScheme.onSurface
     val surfaceColor = MaterialTheme.colorScheme.surface
+    // Trait un peu en retrait du texte (plus clair en thème clair, plus
+    // sombre en thème sombre) pour que les températures restent lisibles
+    // quand elles chevauchent la courbe.
+    val lineColor = lerp(textColor, surfaceColor, LINE_FADE)
+    val familyColor = textColor.copy(alpha = OTHER_MODELS_ALPHA)
+    val nowColor = MaterialTheme.colorScheme.primary
     val darkTheme = surfaceColor.luminance() < 0.5f
-    val nightColor = if (darkTheme) Color.Black.copy(alpha = 0.28f) else lineColor.copy(alpha = 0.06f)
-    val sunColor = if (darkTheme) SunToneDark else SunToneLight
+    val nightColor = if (darkTheme) Color.Black.copy(alpha = 0.28f) else textColor.copy(alpha = 0.06f)
+    val sunriseColor = MaterialTheme.colorScheme.primary
+    val sunsetColor = MaterialTheme.colorScheme.tertiary
+    // Halo couleur fond autour des températures posées sur la courbe.
+    val halo = Shadow(color = surfaceColor, offset = Offset.Zero, blurRadius = 8f)
 
     val host = LocalTimelineTooltipHost.current ?: remember { TimelineTooltipHost() }
     val tooltipKey = remember { Any() }
@@ -276,20 +291,29 @@ internal fun HourlyOutlookChart(
                 }
             }
 
-            // Lever et coucher du soleil, en haut de la courbe.
+            // Lever et coucher du soleil, en haut de la courbe (mêmes icônes
+            // et couleurs que la fiche détaillée), heure centrée sous l'icône.
             visibleSolarEvents.forEach { event ->
+                val eventX = xAt(hoursFromStart(event.at))
                 Column(
                     modifier = Modifier
-                        .offset(x = xAt(hoursFromStart(event.at)) - LabelWidth / 2)
-                        .width(LabelWidth),
+                        .offset(x = eventX - SunLabelWidth / 2)
+                        .width(SunLabelWidth),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    SunEventIcon(sunset = event.sunset, color = sunColor, modifier = Modifier.size(18.dp))
+                    Icon(
+                        imageVector = if (event.sunset) Icons.Filled.Bedtime else Icons.Filled.WbSunny,
+                        contentDescription = null,
+                        tint = if (event.sunset) sunsetColor else sunriseColor,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Text(
                         text = event.at.atZone(zone).format(clockFormatter),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
             }
@@ -312,8 +336,9 @@ internal fun HourlyOutlookChart(
                         isNight = point.isNight == true
                     )
                     Text(
-                        text = units.temp(value, locale = locale),
-                        style = MaterialTheme.typography.titleSmall,
+                        text = units.degrees(value, locale),
+                        style = MaterialTheme.typography.titleSmall.copy(shadow = halo),
+                        color = textColor,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1
                     )
@@ -384,7 +409,7 @@ private fun HourTooltip(
         stringResource(R.string.overview_detail_precipitation) to precipitation,
         stringResource(R.string.overview_detail_humidity) to
             (point.relativeHumidityPercent?.let { stringResource(R.string.overview_percent, it) } ?: dash),
-        stringResource(R.string.overview_detail_dew_point) to units.temp(point.dewPointC, locale = locale)
+        stringResource(R.string.overview_detail_dew_point) to units.degrees(point.dewPointC, locale)
     )
     Surface(
         shape = RoundedCornerShape(16.dp),
@@ -407,7 +432,7 @@ private fun HourTooltip(
                 )
                 Spacer(Modifier.width(6.dp))
                 Text(
-                    text = units.temp(point.temperatureC, locale = locale),
+                    text = units.degrees(point.temperatureC, locale),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
@@ -479,58 +504,6 @@ private fun precipitationHourOf(point: SimplifiedTimelinePoint): OverviewPrecipH
     )
 }
 
-/** Soleil à l'horizon, flèche vers le haut (lever) ou vers le bas (coucher). */
-@Composable
-private fun SunEventIcon(sunset: Boolean, color: Color, modifier: Modifier = Modifier) {
-    Canvas(modifier = modifier) {
-        val w = size.width
-        val h = size.height
-        val stroke = 1.6.dp.toPx()
-        val horizonY = h * 0.78f
-        val center = Offset(w / 2f, horizonY)
-        val radius = w * 0.24f
-        // Demi-disque au-dessus de l'horizon.
-        drawArc(
-            color = color,
-            startAngle = 180f,
-            sweepAngle = 180f,
-            useCenter = true,
-            topLeft = Offset(center.x - radius, center.y - radius),
-            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
-        )
-        drawLine(color, Offset(w * 0.05f, horizonY), Offset(w * 0.95f, horizonY), stroke, StrokeCap.Round)
-        // Rayons.
-        listOf(-60.0, 0.0, 60.0).forEach { angle ->
-            val rad = Math.toRadians(angle - 90.0)
-            val inner = radius + 2.dp.toPx()
-            val outer = radius + 4.5.dp.toPx()
-            drawLine(
-                color,
-                Offset(center.x + (inner * kotlin.math.cos(rad)).toFloat(), center.y + (inner * kotlin.math.sin(rad)).toFloat()),
-                Offset(center.x + (outer * kotlin.math.cos(rad)).toFloat(), center.y + (outer * kotlin.math.sin(rad)).toFloat()),
-                stroke,
-                StrokeCap.Round
-            )
-        }
-        // Flèche sous l'horizon.
-        val arrowTop = horizonY + 1.5.dp.toPx()
-        val arrowBottom = h
-        val arrowHalf = w * 0.12f
-        val path = Path().apply {
-            if (sunset) {
-                moveTo(center.x - arrowHalf, arrowTop)
-                lineTo(center.x, arrowBottom)
-                lineTo(center.x + arrowHalf, arrowTop)
-            } else {
-                moveTo(center.x - arrowHalf, arrowBottom)
-                lineTo(center.x, arrowTop)
-                lineTo(center.x + arrowHalf, arrowBottom)
-            }
-        }
-        drawPath(path, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    }
-}
-
 /**
  * Intervalles de nuit dans [start, end] : du coucher au lever suivant. Si la
  * fenêtre commence la nuit, le premier intervalle part de [start] ; si elle
@@ -556,14 +529,15 @@ internal fun nightRanges(
     return ranges
 }
 
-private val SunToneLight = Color(0xFFE08A00)
-private val SunToneDark = Color(0xFFFFC04D)
+/** Part du fond mêlée à la couleur du texte pour le trait principal. */
+private const val LINE_FADE = 0.3f
 
 private val SidePadding = 20.dp
 private val SolarBand = 34.dp
 private val LabelBand = 50.dp
 private val LabelWidth = 40.dp
 private val NowLabelWidth = 72.dp
+private val SunLabelWidth = 72.dp
 private val TooltipWidth = 184.dp
 private val PlotTop = SolarBand + LabelBand
 private val PlotHeight = 104.dp

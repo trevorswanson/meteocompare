@@ -199,7 +199,7 @@ private fun DailyOutlookRow(
                 val envelopeStart = envelope?.let { minOf(xOf(it.low), start) } ?: start
                 val envelopeEnd = envelope?.let { maxOf(xOf(it.high), end) } ?: end
                 Text(
-                    text = units.temp(low, locale = locale),
+                    text = units.degrees(low, locale),
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.End,
                     maxLines = 1,
@@ -239,7 +239,7 @@ private fun DailyOutlookRow(
                     )
                 }
                 Text(
-                    text = units.temp(high, locale = locale),
+                    text = units.degrees(high, locale),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Medium,
                     maxLines = 1,
