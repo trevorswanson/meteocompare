@@ -1041,6 +1041,9 @@
     <string name="overview_next_hour_level_moderate">Med</string>
     <string name="overview_next_hour_level_heavy">Heavy</string>
     <string name="overview_next_hour_tick">%d min</string>
+    <string name="overview_convergence_high">Models agree</string>
+    <string name="overview_convergence_medium">Models partly agree</string>
+    <string name="overview_convergence_low">Models disagree</string>
     <string name="overview_next_days_title">Next days</string>
     <string name="overview_legend_forecast">Forecast</string>
     <string name="overview_legend_other_models">Other models</string>

@@ -1,6 +1,7 @@
 package com.meteocompare.app.data.remote
 
 import com.meteocompare.app.data.remote.dto.BatchedForecastResponseDto
+import com.meteocompare.app.data.remote.dto.MinutelyPrecipitationByModelDto
 import com.meteocompare.app.data.remote.dto.MinutelyPrecipitationDto
 import com.meteocompare.app.data.remote.dto.UvForecastDto
 import retrofit2.http.GET
@@ -83,6 +84,23 @@ interface OpenMeteoApi {
         @Query("timezone") timezone: String = "auto",
         @Query("precipitation_unit") precipitationUnit: String = "mm"
     ): MinutelyPrecipitationDto
+
+    /**
+     * Même série pour plusieurs modèles au pas natif de 15 minutes, afin de
+     * mesurer leur dispersion. Toujours au moins deux modèles : les variables
+     * sont alors suffixées par la clé du modèle.
+     */
+    @GET("v1/forecast")
+    suspend fun getMinutelyPrecipitationByModel(
+        @Query("latitude") latitude: Double,
+        @Query("longitude") longitude: Double,
+        @Query("models") models: String,
+        @Query("minutely_15") minutely15: String = "precipitation,snowfall",
+        @Query("past_minutely_15") pastSteps: Int = 1,
+        @Query("forecast_minutely_15") forecastSteps: Int = 8,
+        @Query("timezone") timezone: String = "auto",
+        @Query("precipitation_unit") precipitationUnit: String = "mm"
+    ): MinutelyPrecipitationByModelDto
 
     companion object {
         /**

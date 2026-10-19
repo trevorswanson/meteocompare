@@ -101,12 +101,10 @@ class OverviewSectionTest {
     }
 
     @Test
-    fun more_reveals_agreement_which_opens_the_explanation() {
+    fun convergence_badge_opens_the_explanation() {
         var clicks = 0
         render(onWhyClick = { clicks++ })
 
-        composeRule.onNodeWithTag(TAG_OVERVIEW_AGREEMENT).assertDoesNotExist()
-        composeRule.onNodeWithTag(TAG_OVERVIEW_MORE).performClick()
         composeRule.onNodeWithTag(TAG_OVERVIEW_AGREEMENT).performScrollTo().performClick()
 
         assertEquals(1, clicks)

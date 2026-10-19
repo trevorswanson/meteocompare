@@ -27,7 +27,6 @@ import com.meteocompare.app.ui.citydetail.confidence.TAG_CONFIDENCE_EXPLANATION_
 import com.meteocompare.app.ui.citydetail.confidence.TAG_CONFIDENCE_EXPLANATION_ROOT
 import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_AGREEMENT
 import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_MODEL_DETAILS
-import com.meteocompare.app.ui.citydetail.overview.TAG_OVERVIEW_MORE
 import com.meteocompare.app.ui.citylist.TAG_ADD_CITY_RESULT
 import com.meteocompare.app.ui.citylist.TAG_ADD_CITY_SEARCH_FIELD
 import com.meteocompare.app.ui.home.TAG_HOME_ADD_CITY
@@ -232,7 +231,6 @@ class MainActivityNavigationTest {
     fun agreement_opens_the_explanation_and_back_returns_home() {
         openHomeWith(TestFixtures.paris)
 
-        composeRule.onNodeWithTag(TAG_OVERVIEW_MORE).performClick()
         composeRule.onNodeWithTag(TAG_OVERVIEW_AGREEMENT).performScrollTo().performClick()
 
         composeRule.onNodeWithTag(TAG_CONFIDENCE_EXPLANATION_ROOT).assertIsDisplayed()

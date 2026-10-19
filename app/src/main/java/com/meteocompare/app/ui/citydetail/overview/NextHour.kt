@@ -24,7 +24,10 @@ import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.dp
 import com.meteocompare.app.R
+import com.meteocompare.app.domain.model.NATIVE_15_MINUTE_MODELS
 import com.meteocompare.app.domain.model.NextHourPrecipitation
+import com.meteocompare.app.domain.model.WeatherModel
+import com.meteocompare.app.domain.usecase.ForecastConsensus
 import com.meteocompare.app.ui.theme.precipitationMetricAccent
 import java.time.Duration
 import java.time.Instant
@@ -46,7 +49,14 @@ internal data class NextHourOutlook(
     /** Durée de l'épisode pour STARTING_AND_STOPPING. */
     val durationMinutes: Int?,
     /** Intensité en mm/h pour chaque minute de 0 à [NEXT_HOUR_MINUTES] inclus. */
-    val ratesMmPerHour: List<Double>
+    val ratesMmPerHour: List<Double>,
+    /**
+     * Enveloppe min → max des modèles natifs 15 minutes (et du best match),
+     * minute par minute ; null quand moins de deux lignées valides couvrent l'heure.
+     */
+    val band: List<ClosedFloatingPointRange<Double>>? = null,
+    /** Convergence de ces mêmes modèles ; null dans les mêmes cas que [band]. */
+    val agreement: AgreementWording? = null
 )
 
 internal const val NEXT_HOUR_MINUTES = 60
@@ -62,24 +72,18 @@ private const val WET_STEP_MM = 0.05
  * données ne couvrent pas l'heure à venir.
  */
 internal fun buildNextHourOutlook(precipitation: NextHourPrecipitation?, now: Instant): NextHourOutlook? {
-    val steps = precipitation?.steps?.sortedBy { it.endsAt } ?: return null
-    // Chaque valeur couvre le quart d'heure qui se termine à endsAt.
-    fun stepAt(minute: Int): NextHourPrecipitation.Step? {
-        val at = now.plusSeconds(minute * 60L)
-        return steps.firstOrNull { !at.isBefore(it.endsAt.minusSeconds(STEP_MINUTES * 60)) && at.isBefore(it.endsAt) }
-    }
-    val perMinute = (0 until NEXT_HOUR_MINUTES).map(::stepAt)
-    if (perMinute.any { it == null }) return null
-    val wet = perMinute.map { (it?.precipitationMm ?: 0.0) > WET_STEP_MM }
+    val perMinute = precipitation?.steps?.let { windowSteps(it, now) } ?: return null
+    val wet = perMinute.map { it.precipitationMm > WET_STEP_MM }
     if (wet.none { it }) return null
 
-    val window = perMinute.filterNotNull().distinct()
+    val window = perMinute.distinct()
     val wetSteps = window.filter { it.precipitationMm > WET_STEP_MM }
     val peakRate = wetSteps.maxOf { it.precipitationMm } * STEPS_PER_HOUR
     // Neige si au moins la moitié de l'eau tombe sous forme de neige.
     val snowWaterMm = wetSteps.sumOf { it.snowfallCm } / SNOW_CM_PER_WATER_MM
     val isSnow = snowWaterMm >= wetSteps.sumOf { it.precipitationMm } / 2
     val rates = smoothRates(window, now)
+    val members = validMembers(precipitation.members, now)
 
     val (event, minutes, duration) = if (wet.first()) {
         val stop = wet.indexOfFirst { !it }
@@ -100,9 +104,65 @@ internal fun buildNextHourOutlook(precipitation: NextHourPrecipitation?, now: In
         isSnow = isSnow,
         minutes = minutes,
         durationMinutes = duration,
-        ratesMmPerHour = rates
+        ratesMmPerHour = rates,
+        band = members?.let { memberWindows ->
+            val memberRates = memberWindows.map { smoothRates(it.distinct(), now) } + listOf(rates)
+            rates.indices.map { minute ->
+                val values = memberRates.map { it[minute] }
+                values.min()..values.max()
+            }
+        },
+        agreement = members?.let(::memberAgreement)
     )
 }
+
+/**
+ * Quarts d'heure couvrant chaque minute de la prochaine heure, ou null si la
+ * série ne couvre pas toute l'heure (hors domaine, fin de run, données absentes).
+ */
+private fun windowSteps(steps: List<NextHourPrecipitation.Step>, now: Instant): List<NextHourPrecipitation.Step>? {
+    val sorted = steps.sortedBy { it.endsAt }
+    // Chaque valeur couvre le quart d'heure qui se termine à endsAt.
+    val perMinute = (0 until NEXT_HOUR_MINUTES).map { minute ->
+        val at = now.plusSeconds(minute * 60L)
+        sorted.firstOrNull { !at.isBefore(it.endsAt.minusSeconds(STEP_MINUTES * 60)) && at.isBefore(it.endsAt) }
+    }
+    return if (perMinute.any { it == null }) null else perMinute.filterNotNull()
+}
+
+/**
+ * Modèles natifs 15 minutes qui couvrent toute l'heure, une seule source par
+ * lignée (AROME HD et AROME ne sont pas deux avis indépendants). Null s'il en
+ * reste moins de deux : pas de dispersion mesurable.
+ */
+private fun validMembers(
+    members: Map<WeatherModel, List<NextHourPrecipitation.Step>>,
+    now: Instant
+): List<List<NextHourPrecipitation.Step>>? = NATIVE_15_MINUTE_MODELS
+    .mapNotNull { model -> members[model]?.let { windowSteps(it, now) }?.let { model to it } }
+    .distinctBy { (model, _) -> ForecastConsensus.groupFor(model) }
+    .map { it.second }
+    .takeIf { it.size >= 2 }
+
+/**
+ * Part moyenne, minute par minute, des modèles qui tombent dans la classe
+ * d'intensité majoritaire (sec, faible, modérée, forte).
+ */
+private fun memberAgreement(members: List<List<NextHourPrecipitation.Step>>): AgreementWording {
+    val share = (0 until NEXT_HOUR_MINUTES).map { minute ->
+        val classes = members.map { rainIntensity(it[minute].precipitationMm * STEPS_PER_HOUR, WET_STEP_MM * STEPS_PER_HOUR) }
+        classes.groupingBy { it }.eachCount().values.max().toDouble() / classes.size
+    }.average()
+    return when {
+        share >= AGREE_SHARE -> AgreementWording.AGREE
+        share >= SOME_AGREEMENT_SHARE -> AgreementWording.SOME_DISAGREEMENT
+        else -> AgreementWording.DISAGREE
+    }
+}
+
+/** Au plus un quart d'heure de désaccord entre deux modèles reste « d'accord ». */
+private const val AGREE_SHARE = 0.85
+private const val SOME_AGREEMENT_SHARE = 0.6
 
 /** 7 cm de neige pour 10 mm d'eau (rapport utilisé par Open-Meteo). */
 private const val SNOW_CM_PER_WATER_MM = 0.7
@@ -182,19 +242,31 @@ internal fun NextHourSection(outlook: NextHourOutlook, modifier: Modifier = Modi
         modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_NEXT_HOUR),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        OverviewSectionTitle(stringResource(R.string.overview_next_hour_title))
+        OverviewSectionTitle(
+            text = stringResource(R.string.overview_next_hour_title),
+            agreement = outlook.agreement,
+            agreementTag = TAG_OVERVIEW_NEXT_HOUR_AGREEMENT
+        )
         Text(
             text = summary,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         // La phrase ci-dessus décrit déjà la courbe aux lecteurs d'écran.
-        NextHourChart(rates = outlook.ratesMmPerHour, modifier = Modifier.clearAndSetSemantics { })
+        NextHourChart(
+            rates = outlook.ratesMmPerHour,
+            band = outlook.band,
+            modifier = Modifier.clearAndSetSemantics { }
+        )
     }
 }
 
 @Composable
-private fun NextHourChart(rates: List<Double>, modifier: Modifier = Modifier) {
+private fun NextHourChart(
+    rates: List<Double>,
+    band: List<ClosedFloatingPointRange<Double>>?,
+    modifier: Modifier = Modifier
+) {
     val measurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelMedium.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
     val levelLabels = listOf(
@@ -204,6 +276,9 @@ private fun NextHourChart(rates: List<Double>, modifier: Modifier = Modifier) {
     )
     val tickLabels = (1..5).map { stringResource(R.string.overview_next_hour_tick, it * 10) }
     val fractions = remember(rates) { rates.map(::nextHourRateFraction) }
+    val bandFractions = remember(band) {
+        band?.map { nextHourRateFraction(it.start) to nextHourRateFraction(it.endInclusive) }
+    }
     val accent = precipitationMetricAccent()
     val gridColor = MaterialTheme.colorScheme.outlineVariant
     val axisColor = MaterialTheme.colorScheme.outline
@@ -235,7 +310,17 @@ private fun NextHourChart(rates: List<Double>, modifier: Modifier = Modifier) {
             lineTo(x(NEXT_HOUR_MINUTES), baseline)
             close()
         }
-        drawPath(area, accent.copy(alpha = 0.35f))
+        // Enveloppe des modèles natifs 15 minutes : bas puis haut, en un seul contour.
+        bandFractions?.let { bounds ->
+            val envelope = Path().apply {
+                moveTo(x(0), y(bounds.first().second))
+                bounds.forEachIndexed { minute, (_, high) -> lineTo(x(minute), y(high)) }
+                for (minute in bounds.indices.reversed()) lineTo(x(minute), y(bounds[minute].first))
+                close()
+            }
+            drawPath(envelope, accent.copy(alpha = 0.18f))
+        }
+        drawPath(area, accent.copy(alpha = if (bandFractions != null) 0.3f else 0.35f))
         drawPath(
             curve,
             accent,
@@ -254,3 +339,4 @@ private fun NextHourChart(rates: List<Double>, modifier: Modifier = Modifier) {
 
 internal const val TAG_OVERVIEW_NEXT_HOUR = "overview_next_hour"
 internal const val TAG_OVERVIEW_NEXT_HOUR_CHART = "overview_next_hour_chart"
+internal const val TAG_OVERVIEW_NEXT_HOUR_AGREEMENT = "overview_next_hour_agreement"

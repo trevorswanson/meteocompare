@@ -1041,6 +1041,9 @@
     <string name="overview_next_hour_level_moderate">Modérée</string>
     <string name="overview_next_hour_level_heavy">Forte</string>
     <string name="overview_next_hour_tick">%d min</string>
+    <string name="overview_convergence_high">Modèles d’accord</string>
+    <string name="overview_convergence_medium">Accord partiel</string>
+    <string name="overview_convergence_low">Modèles divergents</string>
     <string name="overview_next_days_title">Prochains jours</string>
     <string name="overview_legend_forecast">Prévision</string>
     <string name="overview_legend_other_models">Autres modèles</string>

@@ -1,8 +1,10 @@
 package com.meteocompare.app.ui.citydetail.overview
 
 import com.meteocompare.app.domain.model.NextHourPrecipitation
+import com.meteocompare.app.domain.model.WeatherModel
 import java.time.Instant
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -75,6 +77,74 @@ class NextHourOutlookTest {
     fun `neige quand l'essentiel de l'eau tombe en neige`() {
         val outlook = buildNextHourOutlook(precipitation(0.0, 0.4, 0.4, 0.4, 0.4, 0.4, 0.4, snowCm = 0.28), now)!!
         assertTrue(outlook.isSnow)
+    }
+
+    private fun steps(vararg mm: Double) = precipitation(*mm).steps
+
+    private val wetHour = doubleArrayOf(0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2)
+
+    @Test
+    fun `sans modele natif, le best match seul, sans bande ni badge`() {
+        val outlook = buildNextHourOutlook(precipitation(*wetHour), now)!!
+        assertNull(outlook.band)
+        assertNull(outlook.agreement)
+    }
+
+    @Test
+    fun `deux sources d'une meme lignee ne font pas une dispersion`() {
+        val members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to steps(*wetHour),
+            WeatherModel.AROME_FRANCE to steps(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        )
+        val outlook = buildNextHourOutlook(precipitation(*wetHour).copy(members = members), now)!!
+        assertNull(outlook.band)
+        assertNull(outlook.agreement)
+    }
+
+    @Test
+    fun `un modele qui ne couvre pas l'heure est ecarte`() {
+        val members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to steps(*wetHour),
+            WeatherModel.ICON_D2 to steps(0.2, 0.2)
+        )
+        assertNull(buildNextHourOutlook(precipitation(*wetHour).copy(members = members), now)!!.band)
+    }
+
+    @Test
+    fun `modeles natifs concordants`() {
+        val members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to steps(*wetHour),
+            WeatherModel.ICON_D2 to steps(0.3, 0.3, 0.3, 0.3, 0.3, 0.3, 0.3)
+        )
+        val outlook = buildNextHourOutlook(precipitation(*wetHour).copy(members = members), now)!!
+        assertEquals(AgreementWording.AGREE, outlook.agreement)
+        assertNotNull(outlook.band)
+        val band = outlook.band!!
+        assertEquals(NEXT_HOUR_MINUTES + 1, band.size)
+        // La prévision affichée reste dans l'enveloppe.
+        outlook.ratesMmPerHour.forEachIndexed { minute, rate -> assertTrue(rate in band[minute]) }
+        assertEquals(1.2, band[30].endInclusive, 1e-9)
+    }
+
+    @Test
+    fun `modeles natifs en desaccord`() {
+        val members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to steps(*wetHour),
+            WeatherModel.ICON_D2 to steps(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+        )
+        val outlook = buildNextHourOutlook(precipitation(*wetHour).copy(members = members), now)!!
+        assertEquals(AgreementWording.DISAGREE, outlook.agreement)
+        assertEquals(0.0, outlook.band!![30].start, 1e-9)
+    }
+
+    @Test
+    fun `desaccord partiel sur la moitie de l'heure`() {
+        val members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to steps(*wetHour),
+            WeatherModel.ICON_D2 to steps(0.2, 0.2, 0.2, 0.0, 0.0, 0.2, 0.2)
+        )
+        val outlook = buildNextHourOutlook(precipitation(*wetHour).copy(members = members), now)!!
+        assertEquals(AgreementWording.SOME_DISAGREEMENT, outlook.agreement)
     }
 
     @Test

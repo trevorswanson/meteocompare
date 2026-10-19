@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -29,11 +30,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -53,7 +57,8 @@ import java.util.Locale
 
 /**
  * « Maintenant » : grande icône, température actuelle, condition et
- * max/min du jour. « Plus » déplie vent, UV, soleil et accord des modèles.
+ * max/min du jour, et la pastille de convergence des modèles (qui ouvre
+ * l’explication). « Plus » déplie vent, nuages, UV et soleil.
  */
 @Composable
 internal fun RightNowSection(
@@ -82,7 +87,12 @@ internal fun RightNowSection(
     val nowLabel = currentTemp?.let { stringResource(R.string.overview_now_a11y, units.temp(it, locale = locale)) }
 
     Column(modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_RIGHT_NOW)) {
-        OverviewSectionTitle(stringResource(R.string.overview_right_now_title))
+        OverviewSectionTitle(
+            text = stringResource(R.string.overview_right_now_title),
+            agreement = model.agreement,
+            onAgreementClick = onWhyClick,
+            agreementTag = TAG_OVERVIEW_AGREEMENT
+        )
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -128,7 +138,6 @@ internal fun RightNowSection(
                 timezone = timezone,
                 uvIndex = uvIndex,
                 solarWindow = solarWindow,
-                onWhyClick = onWhyClick,
                 units = units,
                 locale = locale
             )
@@ -166,7 +175,6 @@ private fun RightNowDetails(
     timezone: String?,
     uvIndex: Double?,
     solarWindow: ForecastSolarWindow?,
-    onWhyClick: () -> Unit,
     units: WeatherUnits,
     locale: Locale
 ) {
@@ -218,47 +226,76 @@ private fun RightNowDetails(
                 Text(text = value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
             }
         }
-        model.agreement?.let { AgreementRow(it, onWhyClick) }
     }
 }
 
-/** Accord entre modèles, sans promesse de justesse ; « Pourquoi ? » ouvre l'explication. */
+/**
+ * Titre de section appuyé (style « emphasized » de Material 3 Expressive), avec
+ * à droite le badge de convergence des modèles quand il est connu.
+ */
 @Composable
-private fun AgreementRow(agreement: AgreementWording, onClick: () -> Unit) {
+internal fun OverviewSectionTitle(
+    text: String,
+    modifier: Modifier = Modifier,
+    agreement: AgreementWording? = null,
+    onAgreementClick: (() -> Unit)? = null,
+    agreementTag: String? = null
+) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = text,
+            style = SectionHeadlineStyle,
+            modifier = Modifier.weight(1f).semantics { heading() }
+        )
+        if (agreement != null) {
+            Spacer(Modifier.width(12.dp))
+            ConvergenceBadge(
+                agreement = agreement,
+                onClick = onAgreementClick,
+                modifier = if (agreementTag != null) Modifier.testTag(agreementTag) else Modifier
+            )
+        }
+    }
+}
+
+/**
+ * Pastille de convergence des modèles : décrit leur accord, jamais la justesse.
+ * Cliquable quand une explication détaillée existe.
+ */
+@Composable
+internal fun ConvergenceBadge(
+    agreement: AgreementWording,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null
+) {
     val (labelRes, tone) = when (agreement) {
-        AgreementWording.AGREE -> R.string.overview_agreement_agree to confidenceColor(80)
-        AgreementWording.SOME_DISAGREEMENT -> R.string.overview_agreement_some to confidenceColor(50)
-        AgreementWording.DISAGREE -> R.string.overview_agreement_disagree to confidenceColor(0)
+        AgreementWording.AGREE -> R.string.overview_convergence_high to confidenceColor(80)
+        AgreementWording.SOME_DISAGREEMENT -> R.string.overview_convergence_medium to confidenceColor(50)
+        AgreementWording.DISAGREE -> R.string.overview_convergence_low to confidenceColor(0)
     }
     val label = stringResource(labelRes)
-    val a11y = stringResource(R.string.overview_agreement_a11y, label)
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(role = Role.Button, onClick = onClick)
-            .semantics { contentDescription = a11y }
-            .testTag(TAG_OVERVIEW_AGREEMENT),
-        verticalAlignment = Alignment.CenterVertically
+    val description = if (onClick != null) stringResource(R.string.overview_agreement_a11y, label) else label
+    Surface(
+        shape = CircleShape,
+        color = tone.copy(alpha = 0.14f),
+        modifier = modifier
+            .then(if (onClick != null) Modifier.clip(CircleShape).clickable(role = Role.Button, onClick = onClick) else Modifier)
+            .clearAndSetSemantics { contentDescription = description }
     ) {
-        Box(Modifier.size(10.dp).background(tone, CircleShape))
-        Spacer(Modifier.width(8.dp))
-        Text(text = label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-        Text(
-            text = stringResource(R.string.overview_why),
-            style = MaterialTheme.typography.labelLarge,
-            color = MaterialTheme.colorScheme.primary
-        )
+        Row(
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(Modifier.size(8.dp).background(tone, CircleShape))
+            Spacer(Modifier.width(6.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1
+            )
+        }
     }
-}
-
-/** Titre de section appuyé (style « emphasized » de Material 3 Expressive). */
-@Composable
-internal fun OverviewSectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = SectionHeadlineStyle,
-        modifier = modifier.semantics { androidx.compose.ui.semantics.heading() }
-    )
 }
 
 internal const val TAG_OVERVIEW_RIGHT_NOW = "overview_right_now"

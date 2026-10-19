@@ -11,6 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.meteocompare.app.domain.model.NextHourPrecipitation
 import com.meteocompare.app.domain.model.WeatherCondition
+import com.meteocompare.app.domain.model.WeatherModel
 import com.meteocompare.app.domain.util.forecastSolarWindow
 import com.meteocompare.app.ui.citydetail.DisplayMode
 import com.meteocompare.app.ui.citydetail.buildSimplifiedTimeline
@@ -43,14 +44,25 @@ private fun PreviewOverview() {
     )
 }
 
-/** Pluie faible qui s'interrompt puis reprend, comme une averse qui passe. */
+/**
+ * Pluie faible qui s'interrompt puis reprend, comme une averse qui passe, avec
+ * deux modèles natifs 15 minutes pour l'enveloppe et le badge.
+ */
 private fun previewNextHour(): NextHourOutlook? {
     val now = PreviewFixtures.now
     val start = now.minusSeconds(5 * 60L)
-    val steps = listOf(0.3, 0.35, 0.0, 0.4, 0.6, 0.6).mapIndexed { index, mm ->
-        NextHourPrecipitation.Step(endsAt = start.plusSeconds(index * 15 * 60L), precipitationMm = mm)
+    fun series(vararg mm: Double) = mm.mapIndexed { index, value ->
+        NextHourPrecipitation.Step(endsAt = start.plusSeconds(index * 15 * 60L), precipitationMm = value)
     }
-    return buildNextHourOutlook(NextHourPrecipitation(now, steps), now)
+    val precipitation = NextHourPrecipitation(
+        fetchedAt = now,
+        steps = series(0.3, 0.35, 0.0, 0.4, 0.6, 0.6),
+        members = mapOf(
+            WeatherModel.AROME_FRANCE_HD to series(0.3, 0.4, 0.0, 0.5, 0.8, 0.7),
+            WeatherModel.ICON_D2 to series(0.2, 0.2, 0.1, 0.2, 0.4, 0.5)
+        )
+    )
+    return buildNextHourOutlook(precipitation, now)
 }
 
 @MeteoScreenPreview

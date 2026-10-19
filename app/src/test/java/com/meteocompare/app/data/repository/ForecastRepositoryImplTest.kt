@@ -10,6 +10,7 @@ import com.meteocompare.app.data.remote.OpenMeteoApi
 import com.meteocompare.app.data.remote.dto.BatchedForecastResponseDto
 import com.meteocompare.app.data.remote.dto.ForecastResponseDto
 import com.meteocompare.app.data.remote.dto.UvForecastDto
+import com.meteocompare.app.data.remote.dto.MinutelyPrecipitationByModelDto
 import com.meteocompare.app.data.remote.dto.MinutelyPrecipitationDto
 import com.meteocompare.app.data.remote.dto.DailyDto
 import com.meteocompare.app.data.remote.dto.HourlyDto
@@ -1332,6 +1333,17 @@ class ForecastRepositoryImplTest {
             timezone: String,
             precipitationUnit: String
         ): MinutelyPrecipitationDto = error("Minutely endpoint must not be called by forecast batching tests")
+
+        override suspend fun getMinutelyPrecipitationByModel(
+            latitude: Double,
+            longitude: Double,
+            models: String,
+            minutely15: String,
+            pastSteps: Int,
+            forecastSteps: Int,
+            timezone: String,
+            precipitationUnit: String
+        ): MinutelyPrecipitationByModelDto = error("Minutely endpoint must not be called by forecast batching tests")
 
         fun release() { gate.complete(Unit) }
     }

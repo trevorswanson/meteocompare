@@ -1027,6 +1027,9 @@ dato</string>
     <string name="overview_next_hour_level_moderate">Media</string>
     <string name="overview_next_hour_level_heavy">Forte</string>
     <string name="overview_next_hour_tick">%d min</string>
+    <string name="overview_convergence_high">Modelli concordi</string>
+    <string name="overview_convergence_medium">Accordo parziale</string>
+    <string name="overview_convergence_low">Modelli discordi</string>
     <string name="overview_next_days_title">Prossimi giorni</string>
     <string name="overview_legend_forecast">Previsione</string>
     <string name="overview_legend_other_models">Altri modelli</string>
