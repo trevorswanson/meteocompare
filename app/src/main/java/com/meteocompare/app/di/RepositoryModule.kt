@@ -7,6 +7,7 @@ import com.meteocompare.app.data.repository.ClimateNormalsRepositoryImpl
 import com.meteocompare.app.data.repository.ForecastEvolutionRepositoryImpl
 import com.meteocompare.app.data.repository.ForecastRepositoryImpl
 import com.meteocompare.app.data.repository.MarineRepositoryImpl
+import com.meteocompare.app.data.repository.NextHourPrecipitationRepositoryImpl
 import com.meteocompare.app.data.repository.VigilanceRepositoryImpl
 import com.meteocompare.app.data.repository.UvIndexRepositoryImpl
 import com.meteocompare.app.domain.repository.BiasSampleRepository
@@ -15,6 +16,7 @@ import com.meteocompare.app.domain.repository.ClimateNormalsRepository
 import com.meteocompare.app.domain.repository.ForecastEvolutionRepository
 import com.meteocompare.app.domain.repository.ForecastRepository
 import com.meteocompare.app.domain.repository.MarineRepository
+import com.meteocompare.app.domain.repository.NextHourPrecipitationRepository
 import com.meteocompare.app.domain.repository.UserPreferencesRepository
 import com.meteocompare.app.domain.repository.VigilanceRepository
 import com.meteocompare.app.domain.repository.UvIndexRepository
@@ -51,6 +53,12 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindUvIndexRepository(impl: UvIndexRepositoryImpl): UvIndexRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindNextHourPrecipitationRepository(
+        impl: NextHourPrecipitationRepositoryImpl
+    ): NextHourPrecipitationRepository
 
     @Binds
     @Singleton

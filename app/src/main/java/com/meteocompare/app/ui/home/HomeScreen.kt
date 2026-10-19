@@ -55,7 +55,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,6 +69,7 @@ import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.model.CityForecast
 import com.meteocompare.app.domain.model.ForecastDisplayHorizon
 import com.meteocompare.app.domain.model.ForecastEngineContext
+import com.meteocompare.app.domain.model.NextHourPrecipitation
 import com.meteocompare.app.domain.model.UvForecast
 import com.meteocompare.app.domain.util.forecastIsNightAt
 import com.meteocompare.app.domain.util.forecastSolarWindow
@@ -82,6 +82,7 @@ import com.meteocompare.app.ui.citydetail.cityLocalDate
 import com.meteocompare.app.ui.citydetail.overview.DayOutlook
 import com.meteocompare.app.ui.citydetail.overview.OverviewContent
 import com.meteocompare.app.ui.citydetail.overview.buildDayOutlook
+import com.meteocompare.app.ui.citydetail.overview.buildNextHourOutlook
 import com.meteocompare.app.ui.citydetail.overview.buildOverviewModel
 import com.meteocompare.app.ui.citylist.AddCitySheet
 import com.meteocompare.app.ui.citylist.EmptyState
@@ -146,7 +147,7 @@ internal fun HomeGateContent(
     Scaffold(
         topBar = {
             CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.app_name), fontFamily = FontFamily.Serif) },
+                title = { Text(stringResource(R.string.app_name), fontWeight = FontWeight.SemiBold) },
                 actions = { SettingsAction(onSettingsClick) },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
@@ -183,13 +184,15 @@ fun HomeCityScreen(
     onModelDetailsClick: () -> Unit,
     onConfidenceClick: (isoDate: String) -> Unit,
     homeViewModel: HomeViewModel = hiltViewModel(),
-    detailViewModel: CityDetailViewModel = hiltViewModel()
+    detailViewModel: CityDetailViewModel = hiltViewModel(),
+    nextHourViewModel: NextHourViewModel = hiltViewModel()
 ) {
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val addCityState by homeViewModel.addCityState.collectAsStateWithLifecycle()
     val state by detailViewModel.state.collectAsStateWithLifecycle()
     val isRefreshing by detailViewModel.isRefreshing.collectAsStateWithLifecycle()
     val uvForecast by detailViewModel.uvForecast.collectAsStateWithLifecycle()
+    val nextHourPrecipitation by nextHourViewModel.precipitation.collectAsStateWithLifecycle()
     var showAddSheet by rememberSaveable { mutableStateOf(false) }
     var selectedTab by rememberSaveable { mutableStateOf(HomeTab.WEATHER) }
 
@@ -200,7 +203,12 @@ fun HomeCityScreen(
             onCityGone(homeState.preferredCityId)
         }
     }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { detailViewModel.refreshIfStale() }
+    val currentCity = homeState.cities.firstOrNull { it.id == cityId }
+    LaunchedEffect(currentCity) { currentCity?.let(nextHourViewModel::load) }
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        detailViewModel.refreshIfStale()
+        currentCity?.let(nextHourViewModel::load)
+    }
     HomeEventsEffect(viewModel = homeViewModel, onOpenCity = onSelectCity)
     val refreshToasts = remember(detailViewModel) {
         detailViewModel.refreshFeedback.map { feedback ->
@@ -219,6 +227,7 @@ fun HomeCityScreen(
         state = state,
         isRefreshing = isRefreshing,
         uvForecast = uvForecast,
+        nextHourPrecipitation = nextHourPrecipitation,
         onRefresh = detailViewModel::refresh,
         onSelectCity = { selected -> if (selected != cityId) onSelectCity(selected) },
         onAddCityClick = { showAddSheet = true },
@@ -280,6 +289,7 @@ internal fun HomeCityContent(
     onSettingsClick: () -> Unit,
     onModelDetailsClick: () -> Unit,
     onConfidenceClick: (isoDate: String) -> Unit,
+    nextHourPrecipitation: NextHourPrecipitation? = null,
     selectedTab: HomeTab = HomeTab.WEATHER,
     onTabSelected: (HomeTab) -> Unit = {},
     radarContent: @Composable (Modifier) -> Unit = {},
@@ -313,6 +323,7 @@ internal fun HomeCityContent(
                     state = state,
                     isRefreshing = isRefreshing,
                     uvForecast = uvForecast,
+                    nextHourPrecipitation = nextHourPrecipitation,
                     onRefresh = onRefresh,
                     onModelDetailsClick = onModelDetailsClick,
                     onConfidenceClick = onConfidenceClick
@@ -369,6 +380,7 @@ private fun HomeWeatherTab(
     state: CityDetailUiState,
     isRefreshing: Boolean,
     uvForecast: UvForecast?,
+    nextHourPrecipitation: NextHourPrecipitation?,
     onRefresh: () -> Unit,
     onModelDetailsClick: () -> Unit,
     onConfidenceClick: (isoDate: String) -> Unit
@@ -386,6 +398,7 @@ private fun HomeWeatherTab(
             HomeOverviewList(
                 loaded = state,
                 uvForecast = uvForecast,
+                nextHourPrecipitation = nextHourPrecipitation,
                 onModelDetailsClick = onModelDetailsClick,
                 onConfidenceClick = onConfidenceClick
             )
@@ -431,6 +444,7 @@ private fun HomeChartsTab(modifier: Modifier, viewModel: GraphicForecastViewMode
 private fun HomeOverviewList(
     loaded: CityDetailUiState.Loaded,
     uvForecast: UvForecast?,
+    nextHourPrecipitation: NextHourPrecipitation?,
     onModelDetailsClick: () -> Unit,
     onConfidenceClick: (isoDate: String) -> Unit
 ) {
@@ -463,6 +477,10 @@ private fun HomeOverviewList(
     val today = remember(forecast.city.timezone, now) { cityLocalDate(forecast.city.timezone, now) }
     val solarWindow = remember(forecast, today) { forecastSolarWindow(forecast, today) }
     val isNight = remember(forecast, now) { forecastIsNightAt(forecast, now) == true }
+    // La prochaine heure part de la mesure la plus récente, pas du calcul des prévisions.
+    val nextHour = remember(nextHourPrecipitation, now) {
+        buildNextHourOutlook(nextHourPrecipitation, maxOf(now, nextHourPrecipitation?.fetchedAt ?: now))
+    }
 
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
@@ -485,7 +503,8 @@ private fun HomeOverviewList(
                     solarWindow = solarWindow,
                     onWhyClick = { onConfidenceClick(today.toString()) },
                     onModelDetailsClick = onModelDetailsClick,
-                    dayOutlookFor = dayOutlookFor
+                    dayOutlookFor = dayOutlookFor,
+                    nextHour = nextHour
                 )
             }
             item("attribution") {
@@ -519,8 +538,7 @@ private fun CityPicker(
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleLarge,
-                fontFamily = FontFamily.Serif,
-                fontWeight = FontWeight.SemiBold,
+                fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis

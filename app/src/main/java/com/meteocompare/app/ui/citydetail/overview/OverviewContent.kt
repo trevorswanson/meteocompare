@@ -34,7 +34,8 @@ import java.time.Instant
 import java.time.LocalDate
 
 /**
- * Aperçu simple d'une ville : « Maintenant », « Prochaines 24 heures »,
+ * Aperçu simple d'une ville : « Maintenant », « Prochaine heure » (s'il
+ * tombe quelque chose d'ici une heure), « Prochaines 24 heures »,
  * « Prochains jours », puis l'accès aux détails des modèles.
  *
  * Contenu sans défilement propre : l'écran hôte le place dans sa liste.
@@ -53,6 +54,7 @@ internal fun OverviewContent(
     modifier: Modifier = Modifier,
     onModelDetailsClick: (() -> Unit)? = null,
     dayOutlookFor: (LocalDate) -> DayOutlook? = { null },
+    nextHour: NextHourOutlook? = null,
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     Column(
@@ -70,6 +72,8 @@ internal fun OverviewContent(
             onWhyClick = onWhyClick,
             units = units
         )
+
+        nextHour?.let { NextHourSection(it) }
 
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             OverviewSectionTitle(stringResource(R.string.overview_next_24h_title))

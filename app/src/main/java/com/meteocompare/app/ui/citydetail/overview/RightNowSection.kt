@@ -37,7 +37,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.meteocompare.app.R
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.locale.WeatherTimeFormat
@@ -48,6 +47,7 @@ import com.meteocompare.app.domain.model.WeatherCondition
 import com.meteocompare.app.domain.util.ForecastSolarWindow
 import com.meteocompare.app.ui.citydetail.resolveCityZone
 import com.meteocompare.app.ui.components.AnimatedWeatherIcon
+import com.meteocompare.app.ui.theme.SectionHeadlineStyle
 import com.meteocompare.app.ui.theme.confidenceColor
 import java.util.Locale
 
@@ -251,16 +251,12 @@ private fun AgreementRow(agreement: AgreementWording, onClick: () -> Unit) {
     }
 }
 
-/** Titre de section éditorial, dans l'esprit d'un bulletin météo imprimé. */
+/** Titre de section appuyé (style « emphasized » de Material 3 Expressive). */
 @Composable
 internal fun OverviewSectionTitle(text: String, modifier: Modifier = Modifier) {
     Text(
         text = text,
-        style = MaterialTheme.typography.headlineMedium.copy(
-            fontFamily = androidx.compose.ui.text.font.FontFamily.Serif,
-            fontWeight = FontWeight.Bold,
-            fontSize = 28.sp
-        ),
+        style = SectionHeadlineStyle,
         modifier = modifier.semantics { androidx.compose.ui.semantics.heading() }
     )
 }

@@ -9,6 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.meteocompare.app.domain.model.NextHourPrecipitation
 import com.meteocompare.app.domain.model.WeatherCondition
 import com.meteocompare.app.domain.util.forecastSolarWindow
 import com.meteocompare.app.ui.citydetail.DisplayMode
@@ -37,8 +38,19 @@ private fun PreviewOverview() {
         uvIndex = 4.0,
         solarWindow = forecastSolarWindow(PreviewFixtures.forecast(), PreviewFixtures.today),
         onWhyClick = {},
-        onModelDetailsClick = {}
+        onModelDetailsClick = {},
+        nextHour = previewNextHour()
     )
+}
+
+/** Pluie faible qui s'interrompt puis reprend, comme une averse qui passe. */
+private fun previewNextHour(): NextHourOutlook? {
+    val now = PreviewFixtures.now
+    val start = now.minusSeconds(5 * 60L)
+    val steps = listOf(0.3, 0.35, 0.0, 0.4, 0.6, 0.6).mapIndexed { index, mm ->
+        NextHourPrecipitation.Step(endsAt = start.plusSeconds(index * 15 * 60L), precipitationMm = mm)
+    }
+    return buildNextHourOutlook(NextHourPrecipitation(now, steps), now)
 }
 
 @MeteoScreenPreview
@@ -94,6 +106,16 @@ private fun OverviewComponentsPreview() {
                 now = PreviewFixtures.now
             )
             DailyOutlook(days = model.daily, ranges = model.dailyRanges, timezone = PreviewFixtures.city.timezone, now = PreviewFixtures.now)
+        }
+    }
+}
+
+@MeteoComponentPreview
+@Composable
+private fun NextHourSectionPreview() {
+    MeteoPreviewSurface {
+        Column(Modifier.padding(16.dp)) {
+            previewNextHour()?.let { NextHourSection(it) }
         }
     }
 }
