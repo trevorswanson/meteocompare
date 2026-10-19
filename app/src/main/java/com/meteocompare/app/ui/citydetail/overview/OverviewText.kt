@@ -55,14 +55,6 @@ internal fun periodPhraseRes(phrase: PeriodPhrase): Int = when (phrase) {
     PeriodPhrase.IN_THE_EVENING -> R.string.overview_when_in_the_evening
 }
 
-@StringRes
-internal fun periodNameRes(period: DayPeriod): Int = when (period) {
-    DayPeriod.MORNING -> R.string.overview_period_morning
-    DayPeriod.AFTERNOON -> R.string.overview_period_afternoon
-    DayPeriod.EVENING -> R.string.overview_period_evening
-    DayPeriod.OVERNIGHT -> R.string.overview_period_overnight
-}
-
 /** Signal pluie compact : pourcentage seulement s'il vient de probabilités natives. */
 @Composable
 internal fun rainSignalText(hour: OverviewPrecipHour?): String? = when (hour?.wording) {

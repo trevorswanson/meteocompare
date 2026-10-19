@@ -1003,6 +1003,9 @@ datos</string>
     <string name="overview_detail_wind">Viento</string>
     <string name="overview_detail_wind_gusts">%1$s, rachas %2$s</string>
     <string name="overview_detail_clouds">Nubosidad</string>
+    <string name="overview_detail_precipitation">Precipitación</string>
+    <string name="overview_detail_humidity">Humedad</string>
+    <string name="overview_detail_dew_point">Punto de rocío</string>
     <string name="overview_detail_uv">Índice UV</string>
     <string name="overview_detail_sunrise">Salida del sol</string>
     <string name="overview_detail_sunset">Puesta de sol</string>
@@ -1027,12 +1030,6 @@ datos</string>
     <string name="overview_convergence_medium">Acuerdo parcial</string>
     <string name="overview_convergence_low">Modelos en desacuerdo</string>
     <string name="overview_next_days_title">Próximos días</string>
-    <string name="overview_legend_forecast">Previsión</string>
-    <string name="overview_legend_other_models">Otros modelos</string>
-    <string name="overview_period_morning">Mañana</string>
-    <string name="overview_period_afternoon">Tarde</string>
-    <string name="overview_period_evening">Noche</string>
-    <string name="overview_period_overnight">Madrugada</string>
     <string name="overview_when_this_morning">esta mañana</string>
     <string name="overview_when_this_afternoon">esta tarde</string>
     <string name="overview_when_this_evening">esta noche</string>

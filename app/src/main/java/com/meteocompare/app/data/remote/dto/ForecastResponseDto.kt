@@ -50,7 +50,10 @@ data class HourlyDto(
     val cloudCover: List<Int?>? = null,
     /** Maximum des rafales à 10 m sur l’heure précédente, en unité vent demandée. */
     @SerialName("wind_gusts_10m")
-    val windGusts10m: List<Double?>? = null
+    val windGusts10m: List<Double?>? = null,
+    /** Humidité relative à 2 m, 0-100 %. Absente des caches antérieurs. */
+    @SerialName("relative_humidity_2m")
+    val relativeHumidity2m: List<Int?>? = null
 )
 
 @Serializable

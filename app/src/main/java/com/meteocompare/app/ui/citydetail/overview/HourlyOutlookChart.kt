@@ -2,9 +2,11 @@ package com.meteocompare.app.ui.citydetail.overview
 
 import android.content.res.Resources
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,16 +17,15 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -35,7 +36,10 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -44,7 +48,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.meteocompare.app.R
@@ -52,37 +55,43 @@ import com.meteocompare.app.core.charts.canonicalChartRange
 import com.meteocompare.app.core.charts.metricPlotValue
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.locale.WeatherTimeFormat
+import com.meteocompare.app.core.locale.weatherConditionLabelRes
 import com.meteocompare.app.core.units.LocalWeatherUnits
 import com.meteocompare.app.core.units.WeatherUnit
 import com.meteocompare.app.core.units.WeatherUnits
 import com.meteocompare.app.ui.citydetail.SimplifiedTimelinePoint
 import com.meteocompare.app.ui.citydetail.resolveCityZone
 import com.meteocompare.app.ui.components.AnimatedWeatherIcon
+import com.meteocompare.app.ui.components.WindArrow
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /**
- * Courbe des prochaines heures, défilable horizontalement.
+ * Courbe des prochaines heures, ajustée à la largeur de l'écran (sans défilement).
  *
- * - En-tête : Matin / Après-midi / Soirée / Nuit et signal pluie de chaque tranche.
+ * - En haut : lever et coucher du soleil ; la nuit est légèrement assombrie.
  * - Trait foncé : prévision retenue (centrale du moteur sélectionné), avec un
- *   point, une icône et la température toutes les trois heures.
+ *   point, une icône et la température à intervalle régulier.
  * - Traits pâles : une ligne par lignée de modèles indépendante. Un faisceau
  *   serré signale une prévision solide ; ce ne sont pas des probabilités.
  * - Repère « Maintenant » en pointillés.
+ * - Toucher une heure affiche une infobulle (condition, température, pluie,
+ *   humidité, point de rosée, vent) qui reste jusqu'au prochain toucher
+ *   ailleurs ; glisser la fait suivre le doigt et la ferme au relâchement.
  */
 @Composable
 internal fun HourlyOutlookChart(
     points: List<SimplifiedTimelinePoint>,
     traces: List<FamilyTrace>,
-    periods: List<PeriodSummary>,
     timezone: String?,
     now: Instant?,
     modifier: Modifier = Modifier,
-    showLegend: Boolean = true,
+    solarEvents: List<SolarEvent> = emptyList(),
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
     val main = points.map { metricPlotValue(it.temperatureC) }
@@ -100,6 +109,7 @@ internal fun HourlyOutlookChart(
     val clock = LocalClockFormatPreference.current
     val zone = remember(timezone) { resolveCityZone(timezone) }
     val hourFormatter = remember(locale, clock) { WeatherTimeFormat.hour(locale, clock) }
+    val clockFormatter = remember(locale, clock) { WeatherTimeFormat.clock(locale, clock) }
     val resources = LocalResources.current
     val description = remember(points, traces, units, zone, hourFormatter, resources, locale) {
         hourlyOutlookDescription(resources, units, points, traces, zone, hourFormatter, locale)
@@ -113,182 +123,328 @@ internal fun HourlyOutlookChart(
         )
     }
     val first = requireNotNull(points.first().instant)
-    val marked = remember(points, zone) {
-        points.indices.filter { index -> points[index].instant!!.atZone(zone).hour % 3 == 0 }
-    }
     val last = requireNotNull(points.last().instant)
+    val lastIndex = (points.size - 1).toFloat()
+    fun hoursFromStart(instant: Instant): Float = Duration.between(first, instant).seconds / 3600f
     // Le repère « Maintenant » n'apparaît que si l'instant présent est dans la fenêtre.
     val nowOffsetHours = now
-        ?.takeIf { !it.isBefore(first) && !it.isAfter(last.plusSeconds(3_599)) }
-        ?.let { (Duration.between(first, it).toMinutes() / 60f).coerceIn(0f, (points.size - 1).toFloat()) }
-
-    val contentWidth = SidePadding * 2 + HourWidth * (points.size - 1)
-    fun xAt(index: Float): Dp = SidePadding + HourWidth * index
-    fun yAt(value: Double): Dp = PlotTop + PlotHeight * (1f - ((value - range.min) / range.span).toFloat())
+        ?.takeIf { !it.isBefore(first) && !it.isAfter(last) }
+        ?.let { hoursFromStart(it).coerceIn(0f, lastIndex) }
+    val visibleSolarEvents = remember(solarEvents, first, last) {
+        solarEvents.filter { !it.at.isBefore(first) && !it.at.isAfter(last) }
+    }
+    val nights = remember(first, last, points, solarEvents) {
+        nightRanges(first, last, points.first().isNight == true, solarEvents)
+    }
 
     val lineColor = MaterialTheme.colorScheme.onSurface
     val familyColor = MaterialTheme.colorScheme.onSurface.copy(alpha = OTHER_MODELS_ALPHA)
-    val separatorColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f)
     val nowColor = MaterialTheme.colorScheme.primary
     val surfaceColor = MaterialTheme.colorScheme.surface
+    val darkTheme = surfaceColor.luminance() < 0.5f
+    val nightColor = if (darkTheme) Color.Black.copy(alpha = 0.28f) else lineColor.copy(alpha = 0.06f)
+    val sunColor = if (darkTheme) SunToneDark else SunToneLight
 
-    Column(modifier = modifier.fillMaxWidth()) {
+    val host = LocalTimelineTooltipHost.current ?: remember { TimelineTooltipHost() }
+    val tooltipKey = remember { Any() }
+    var selectedIndex by remember { mutableStateOf<Int?>(null) }
+    val selected = selectedIndex?.takeIf { host.activeKey === tooltipKey && it in points.indices }
+
+    BoxWithConstraints(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag(TAG_OVERVIEW_HOURLY_CHART)
+            .semantics { contentDescription = description }
+    ) {
+        val chartWidth = maxWidth
+        val hourWidth = (chartWidth - SidePadding * 2) / lastIndex.coerceAtLeast(1f)
+        // Intervalle des étiquettes : le plus court qui laisse la place à une étiquette.
+        val labelStep = LabelSteps.firstOrNull { hourWidth * it >= LabelWidth } ?: LabelSteps.last()
+        val marked = remember(points, zone, labelStep) {
+            points.indices.filter { index -> points[index].instant!!.atZone(zone).hour % labelStep == 0 }
+        }
+        fun xAt(index: Float): Dp = SidePadding + hourWidth * index
+        fun yAt(value: Double): Dp = PlotTop + PlotHeight * (1f - ((value - range.min) / range.span).toFloat())
+        val density = LocalDensity.current
+        val sidePx = with(density) { SidePadding.toPx() }
+        val hourPx = with(density) { hourWidth.toPx() }
+
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .testTag(TAG_OVERVIEW_HOURLY_CHART)
-                .semantics { contentDescription = description }
-        ) {
-            Box(
-                modifier = Modifier
-                    .width(contentWidth)
-                    .height(ChartHeight)
-                    .clearAndSetSemantics { }
-            ) {
-                Canvas(modifier = Modifier.fillMaxSize()) {
-                    fun x(index: Float) = xAt(index).toPx()
-                    fun y(value: Double) = yAt(value).toPx()
-
-                    // Séparateurs de tranches.
-                    periods.drop(1).forEach { period ->
-                        val px = x(period.startIndex - 0.5f)
-                        drawLine(separatorColor, Offset(px, 0f), Offset(px, (PlotTop + PlotHeight).toPx()), 1.dp.toPx())
+                .height(ChartHeight)
+                .clearAndSetSemantics { }
+                .pointerInput(points.size, sidePx, hourPx) {
+                    fun indexAt(x: Float) = ((x - sidePx) / hourPx).roundToInt().coerceIn(0, points.size - 1)
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        var dragging = false
+                        var cancelled = false
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) {
+                                if (dragging) {
+                                    host.activeKey = null
+                                } else if (!cancelled) {
+                                    // Toucher : l'infobulle reste jusqu'au prochain toucher ailleurs.
+                                    selectedIndex = indexAt(change.position.x)
+                                    host.activeKey = tooltipKey
+                                }
+                                break
+                            }
+                            val delta = change.position - down.position
+                            if (!dragging && !cancelled) {
+                                if (abs(delta.x) > viewConfiguration.touchSlop && abs(delta.x) > abs(delta.y)) {
+                                    dragging = true
+                                } else if (abs(delta.y) > viewConfiguration.touchSlop) {
+                                    // Défilement vertical de la page : on s'efface.
+                                    cancelled = true
+                                }
+                            }
+                            if (dragging) {
+                                change.consume()
+                                selectedIndex = indexAt(change.position.x)
+                                host.activeKey = tooltipKey
+                            }
+                        }
                     }
+                }
+        ) {
+            Canvas(modifier = Modifier.fillMaxSize()) {
+                fun x(index: Float) = xAt(index).toPx()
+                fun y(value: Double) = yAt(value).toPx()
+                val bottom = (PlotTop + PlotHeight).toPx()
 
-                    // Repère « Maintenant ».
-                    if (nowOffsetHours != null) {
-                        val nowX = x(nowOffsetHours)
-                        drawLine(
-                            color = nowColor,
-                            start = Offset(nowX, HeaderHeight.toPx()),
-                            end = Offset(nowX, (PlotTop + PlotHeight).toPx()),
-                            strokeWidth = 1.5.dp.toPx(),
-                            pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
+                // Nuit : bande légèrement plus sombre entre coucher et lever.
+                nights.forEach { (from, to) ->
+                    val left = x(hoursFromStart(from).coerceIn(0f, lastIndex)).coerceAtLeast(0f)
+                    val right = x(hoursFromStart(to).coerceIn(0f, lastIndex))
+                    val clampedLeft = if (from == first) 0f else left
+                    val clampedRight = if (to == last) size.width else right
+                    if (clampedRight > clampedLeft) {
+                        drawRect(
+                            color = nightColor,
+                            topLeft = Offset(clampedLeft, 0f),
+                            size = androidx.compose.ui.geometry.Size(clampedRight - clampedLeft, bottom)
                         )
                     }
-
-                    // Autres modèles : traits pâles et épais, lissés.
-                    val familyStroke = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    traces.forEach { trace ->
-                        drawSmoothSeries(trace.values.map(::metricPlotValue), ::x, ::y, familyColor, familyStroke)
-                    }
-
-                    // Prévision retenue.
-                    drawSmoothSeries(
-                        main,
-                        ::x,
-                        ::y,
-                        lineColor,
-                        Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-                    )
-                    marked.forEach { index ->
-                        val value = main[index] ?: return@forEach
-                        val center = Offset(x(index.toFloat()), y(value))
-                        drawCircle(surfaceColor, radius = 6.5.dp.toPx(), center = center)
-                        drawCircle(lineColor, radius = 5.dp.toPx(), center = center)
-                    }
                 }
 
-                // En-têtes de tranches : nom et signal pluie.
-                periods.forEach { period ->
-                    val start = xAt(period.startIndex - 0.5f).coerceAtLeast(0.dp)
-                    val end = xAt(period.endIndex + 0.5f).coerceAtMost(contentWidth)
-                    PeriodHeader(
-                        period = period,
-                        modifier = Modifier
-                            .offset(x = start)
-                            .width((end - start).coerceAtLeast(0.dp))
-                            .height(HeaderHeight)
+                // Repère « Maintenant ».
+                if (nowOffsetHours != null) {
+                    val nowX = x(nowOffsetHours)
+                    drawLine(
+                        color = nowColor,
+                        start = Offset(nowX, SolarBand.toPx()),
+                        end = Offset(nowX, bottom),
+                        strokeWidth = 1.5.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 3.dp.toPx()))
                     )
                 }
 
-                // Icône et température toutes les trois heures, au-dessus du point.
+                // Autres modèles : traits pâles et épais, lissés.
+                val familyStroke = Stroke(width = 3.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                traces.forEach { trace ->
+                    drawSmoothSeries(trace.values.map(::metricPlotValue), ::x, ::y, familyColor, familyStroke)
+                }
+
+                // Prévision retenue.
+                drawSmoothSeries(
+                    main,
+                    ::x,
+                    ::y,
+                    lineColor,
+                    Stroke(width = 3.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+                )
                 marked.forEach { index ->
                     val value = main[index] ?: return@forEach
-                    val point = points[index]
-                    Column(
-                        modifier = Modifier
-                            .offset(x = xAt(index.toFloat()) - LabelWidth / 2, y = yAt(value) - LabelBand)
-                            .width(LabelWidth),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        AnimatedWeatherIcon(
-                            condition = point.condition,
-                            size = 26.dp,
-                            animated = false,
-                            animateConditionChanges = false,
-                            isNight = point.isNight == true
-                        )
-                        Text(
-                            text = units.temp(value, locale = locale),
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.Bold,
-                            maxLines = 1
-                        )
+                    val center = Offset(x(index.toFloat()), y(value))
+                    drawCircle(surfaceColor, radius = 6.5.dp.toPx(), center = center)
+                    drawCircle(lineColor, radius = 5.dp.toPx(), center = center)
+                }
+
+                // Heure sélectionnée.
+                if (selected != null) {
+                    val selectedX = x(selected.toFloat())
+                    drawLine(nowColor, Offset(selectedX, SolarBand.toPx()), Offset(selectedX, bottom), 2.dp.toPx())
+                    main[selected]?.let { value ->
+                        val center = Offset(selectedX, y(value))
+                        drawCircle(surfaceColor, radius = 7.5.dp.toPx(), center = center)
+                        drawCircle(nowColor, radius = 6.dp.toPx(), center = center)
                     }
                 }
+            }
 
-                // Axe horaire et « Maintenant ».
-                if (nowOffsetHours != null) {
+            // Lever et coucher du soleil, en haut de la courbe.
+            visibleSolarEvents.forEach { event ->
+                Column(
+                    modifier = Modifier
+                        .offset(x = xAt(hoursFromStart(event.at)) - LabelWidth / 2)
+                        .width(LabelWidth),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    SunEventIcon(sunset = event.sunset, color = sunColor, modifier = Modifier.size(18.dp))
                     Text(
-                        text = stringResource(R.string.timeline_now),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = nowColor,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .offset(x = xAt(nowOffsetHours) - LabelWidth / 2, y = PlotTop + PlotHeight + 4.dp)
-                            .width(LabelWidth)
-                    )
-                }
-                marked.forEach { index ->
-                    Text(
-                        text = points[index].instant!!.atZone(zone).format(hourFormatter),
-                        style = MaterialTheme.typography.labelMedium,
+                        text = event.at.atZone(zone).format(clockFormatter),
+                        style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1,
-                        modifier = Modifier
-                            .offset(x = xAt(index.toFloat()) - LabelWidth / 2, y = PlotTop + PlotHeight + 22.dp)
-                            .width(LabelWidth)
+                        maxLines = 1
                     )
                 }
             }
-        }
-        if (showLegend && traces.size >= 2) {
-            ChartLegend(lineColor = lineColor, familyColor = familyColor)
-        }
-    }
-}
 
-@Composable
-private fun PeriodHeader(period: PeriodSummary, modifier: Modifier) {
-    val rain = rainSignalText(period.peakRain)
-    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(
-            text = stringResource(periodNameRes(period.period)),
-            style = MaterialTheme.typography.titleSmall,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            softWrap = false,
-            overflow = TextOverflow.Clip
-        )
-        if (rain != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Filled.WaterDrop,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(Modifier.width(2.dp))
+            // Icône et température à intervalle régulier, au-dessus du point.
+            marked.forEach { index ->
+                val value = main[index] ?: return@forEach
+                val point = points[index]
+                Column(
+                    modifier = Modifier
+                        .offset(x = xAt(index.toFloat()) - LabelWidth / 2, y = yAt(value) - LabelBand)
+                        .width(LabelWidth),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    AnimatedWeatherIcon(
+                        condition = point.condition,
+                        size = 24.dp,
+                        animated = false,
+                        animateConditionChanges = false,
+                        isNight = point.isNight == true
+                    )
+                    Text(
+                        text = units.temp(value, locale = locale),
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            // Axe horaire et « Maintenant ».
+            if (nowOffsetHours != null) {
                 Text(
-                    text = rain,
+                    text = stringResource(R.string.timeline_now),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = nowColor,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier
+                        .offset(x = xAt(nowOffsetHours) - NowLabelWidth / 2, y = PlotTop + PlotHeight + 4.dp)
+                        .width(NowLabelWidth)
+                )
+            }
+            marked.forEach { index ->
+                Text(
+                    text = points[index].instant!!.atZone(zone).format(hourFormatter),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
                     maxLines = 1,
-                    softWrap = false
+                    modifier = Modifier
+                        .offset(x = xAt(index.toFloat()) - LabelWidth / 2, y = PlotTop + PlotHeight + 22.dp)
+                        .width(LabelWidth)
+                )
+            }
+
+            if (selected != null) {
+                // À côté de l'heure choisie, du côté où il y a le plus de place.
+                val selectedX = xAt(selected.toFloat())
+                val tooltipX = (if (selectedX > chartWidth / 2) selectedX - TooltipWidth - 10.dp else selectedX + 10.dp)
+                    .coerceIn(0.dp, (chartWidth - TooltipWidth).coerceAtLeast(0.dp))
+                HourTooltip(
+                    point = points[selected],
+                    time = points[selected].instant!!.atZone(zone).format(clockFormatter),
+                    units = units,
+                    locale = locale,
+                    modifier = Modifier
+                        .offset(x = tooltipX)
+                        .width(TooltipWidth)
+                        .testTag(TAG_OVERVIEW_HOURLY_TOOLTIP)
+                )
+            }
+        }
+    }
+}
+
+/** Infobulle d'une heure : condition, température, pluie, humidité, point de rosée, vent. */
+@Composable
+private fun HourTooltip(
+    point: SimplifiedTimelinePoint,
+    time: String,
+    units: WeatherUnits,
+    locale: Locale,
+    modifier: Modifier = Modifier
+) {
+    val dash = "—"
+    val precipitation = buildList {
+        point.precipitationMm?.takeIf { it > 0.0 }?.let { add(units.rain(it, locale)) }
+        rainSignalText(precipitationHourOf(point))?.let { add(it) }
+    }.joinToString(" · ").ifEmpty { dash }
+    val rows = listOf(
+        stringResource(R.string.overview_detail_precipitation) to precipitation,
+        stringResource(R.string.overview_detail_humidity) to
+            (point.relativeHumidityPercent?.let { stringResource(R.string.overview_percent, it) } ?: dash),
+        stringResource(R.string.overview_detail_dew_point) to units.temp(point.dewPointC, locale = locale)
+    )
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        shadowElevation = 6.dp,
+        tonalElevation = 2.dp,
+        modifier = modifier
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AnimatedWeatherIcon(
+                    condition = point.condition,
+                    size = 22.dp,
+                    animated = false,
+                    animateConditionChanges = false,
+                    isNight = point.isNight == true
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    text = units.temp(point.temperatureC, locale = locale),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = time,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1
+                )
+            }
+            point.condition?.let {
+                Text(
+                    text = stringResource(weatherConditionLabelRes(it)),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
+                )
+            }
+            rows.forEach { (label, value) -> TooltipRow(label, value) }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.overview_detail_wind),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.weight(1f)
+                )
+                point.windDirectionDeg?.let { direction ->
+                    WindArrow(directionDegrees = direction, size = 12.dp)
+                    Spacer(Modifier.width(2.dp))
+                }
+                Text(
+                    text = point.windKmh?.let { units.speed(it, locale) } ?: dash,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1
                 )
             }
         }
@@ -296,40 +452,125 @@ private fun PeriodHeader(period: PeriodSummary, modifier: Modifier) {
 }
 
 @Composable
-private fun ChartLegend(lineColor: Color, familyColor: Color) {
-    Surface(
-        shape = RoundedCornerShape(50),
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Canvas(Modifier.size(width = 28.dp, height = 10.dp)) {
-                val y = size.height / 2f
-                drawLine(lineColor, Offset(0f, y), Offset(size.width, y), 3.dp.toPx(), StrokeCap.Round)
-                drawCircle(lineColor, radius = 4.dp.toPx(), center = Offset(size.width / 2f, y))
-            }
-            Spacer(Modifier.width(6.dp))
-            Text(stringResource(R.string.overview_legend_forecast), style = MaterialTheme.typography.labelLarge)
-            Spacer(Modifier.width(18.dp))
-            Canvas(Modifier.size(width = 28.dp, height = 10.dp)) {
-                val y = size.height / 2f
-                drawLine(familyColor, Offset(0f, y), Offset(size.width, y), 4.dp.toPx(), StrokeCap.Round)
-            }
-            Spacer(Modifier.width(6.dp))
-            Text(
-                stringResource(R.string.overview_legend_other_models),
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-        }
+private fun TooltipRow(label: String, value: String) {
+    Row {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Text(text = value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
+
+/** Signal pluie d'une heure, avec les mêmes règles de formulation que l'aperçu. */
+private fun precipitationHourOf(point: SimplifiedTimelinePoint): OverviewPrecipHour? {
+    val instant = point.instant ?: return null
+    if ((point.precipitationPercent ?: 0) <= 0) return null
+    return OverviewPrecipHour(
+        instant = instant,
+        likelihoodPercent = point.precipitationPercent,
+        wording = rainLikelihoodWording(point.precipitationSource),
+        familyShare = FamilyRainShare(wet = point.wetModelCount, total = point.precipitationModelCount),
+        amountIfRainMm = point.precipitationConditionalMm,
+        intensity = RainIntensity.NONE,
+        isNight = point.isNight
+    )
+}
+
+/** Soleil à l'horizon, flèche vers le haut (lever) ou vers le bas (coucher). */
+@Composable
+private fun SunEventIcon(sunset: Boolean, color: Color, modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val stroke = 1.6.dp.toPx()
+        val horizonY = h * 0.78f
+        val center = Offset(w / 2f, horizonY)
+        val radius = w * 0.24f
+        // Demi-disque au-dessus de l'horizon.
+        drawArc(
+            color = color,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = true,
+            topLeft = Offset(center.x - radius, center.y - radius),
+            size = androidx.compose.ui.geometry.Size(radius * 2, radius * 2)
+        )
+        drawLine(color, Offset(w * 0.05f, horizonY), Offset(w * 0.95f, horizonY), stroke, StrokeCap.Round)
+        // Rayons.
+        listOf(-60.0, 0.0, 60.0).forEach { angle ->
+            val rad = Math.toRadians(angle - 90.0)
+            val inner = radius + 2.dp.toPx()
+            val outer = radius + 4.5.dp.toPx()
+            drawLine(
+                color,
+                Offset(center.x + (inner * kotlin.math.cos(rad)).toFloat(), center.y + (inner * kotlin.math.sin(rad)).toFloat()),
+                Offset(center.x + (outer * kotlin.math.cos(rad)).toFloat(), center.y + (outer * kotlin.math.sin(rad)).toFloat()),
+                stroke,
+                StrokeCap.Round
+            )
+        }
+        // Flèche sous l'horizon.
+        val arrowTop = horizonY + 1.5.dp.toPx()
+        val arrowBottom = h
+        val arrowHalf = w * 0.12f
+        val path = Path().apply {
+            if (sunset) {
+                moveTo(center.x - arrowHalf, arrowTop)
+                lineTo(center.x, arrowBottom)
+                lineTo(center.x + arrowHalf, arrowTop)
+            } else {
+                moveTo(center.x - arrowHalf, arrowBottom)
+                lineTo(center.x, arrowTop)
+                lineTo(center.x + arrowHalf, arrowBottom)
+            }
+        }
+        drawPath(path, color, style = Stroke(width = stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/**
+ * Intervalles de nuit dans [start, end] : du coucher au lever suivant. Si la
+ * fenêtre commence la nuit, le premier intervalle part de [start] ; si elle
+ * finit la nuit, le dernier s'arrête à [end].
+ */
+internal fun nightRanges(
+    start: Instant,
+    end: Instant,
+    startsAtNight: Boolean,
+    events: List<SolarEvent>
+): List<Pair<Instant, Instant>> {
+    val ranges = mutableListOf<Pair<Instant, Instant>>()
+    var nightStart: Instant? = if (startsAtNight) start else null
+    events.filter { it.at.isAfter(start) && it.at.isBefore(end) }.sortedBy { it.at }.forEach { event ->
+        if (event.sunset) {
+            if (nightStart == null) nightStart = event.at
+        } else {
+            ranges += (nightStart ?: start) to event.at
+            nightStart = null
+        }
+    }
+    nightStart?.let { ranges += it to end }
+    return ranges
+}
+
+private val SunToneLight = Color(0xFFE08A00)
+private val SunToneDark = Color(0xFFFFC04D)
+
+private val SidePadding = 20.dp
+private val SolarBand = 34.dp
+private val LabelBand = 50.dp
+private val LabelWidth = 40.dp
+private val NowLabelWidth = 72.dp
+private val TooltipWidth = 184.dp
+private val PlotTop = SolarBand + LabelBand
+private val PlotHeight = 104.dp
+private val ChartHeight = PlotTop + PlotHeight + 44.dp
+private val LabelSteps = listOf(1, 2, 3, 4, 6)
+
+internal const val TAG_OVERVIEW_HOURLY_TOOLTIP = "overview_hourly_tooltip"
 
 /**
  * Trace une série lissée (Catmull-Rom converti en Bézier cubique), coupée
@@ -408,13 +649,5 @@ internal fun hourlyOutlookDescription(
     )
 }
 
-private val HourWidth = 17.dp
-private val SidePadding = 22.dp
-private val HeaderHeight = 44.dp
-private val LabelBand = 52.dp
-private val LabelWidth = 48.dp
-private val PlotTop = HeaderHeight + LabelBand
-private val PlotHeight = 104.dp
-private val ChartHeight = PlotTop + PlotHeight + 44.dp
 
 internal const val TAG_OVERVIEW_HOURLY_CHART = "overview_hourly_chart"

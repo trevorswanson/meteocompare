@@ -54,7 +54,9 @@ class ForecastMapper @Inject constructor() {
                 cloudCover = alignNonNullTimesInt(times, h.cloudCover)
                     .map(ForecastPhysicalLimits::percentage),
                 windGusts10m = alignNonNullTimes(times, h.windGusts10m)
-                    .map(ForecastPhysicalLimits::gust)
+                    .map(ForecastPhysicalLimits::gust),
+                relativeHumidity2m = alignNonNullTimesInt(times, h.relativeHumidity2m)
+                    .map(ForecastPhysicalLimits::percentage)
             )
         } ?: HourlyForecast(
             timestamps = emptyList(),

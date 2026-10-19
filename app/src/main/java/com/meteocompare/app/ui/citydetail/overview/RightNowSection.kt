@@ -58,7 +58,8 @@ import java.util.Locale
 /**
  * « Maintenant » : grande icône, température actuelle, condition et
  * max/min du jour, et la pastille de convergence des modèles (qui ouvre
- * l’explication). « Plus » déplie vent, nuages, UV et soleil.
+ * l’explication). « Plus » déplie vent, nuages, humidité, point de rosée, UV
+ * et soleil.
  */
 @Composable
 internal fun RightNowSection(
@@ -195,6 +196,12 @@ private fun RightNowDetails(
         }
         current?.cloudCoverPercent?.let {
             add(stringResource(R.string.overview_detail_clouds) to stringResource(R.string.overview_percent, it))
+        }
+        current?.relativeHumidityPercent?.let {
+            add(stringResource(R.string.overview_detail_humidity) to stringResource(R.string.overview_percent, it))
+        }
+        current?.dewPointC?.let {
+            add(stringResource(R.string.overview_detail_dew_point) to units.temp(it, locale = locale))
         }
         uvIndex?.takeIf { it.isFinite() && it >= 0.0 }?.let {
             add(stringResource(R.string.overview_detail_uv) to stringResource(R.string.uv_index_value, it))

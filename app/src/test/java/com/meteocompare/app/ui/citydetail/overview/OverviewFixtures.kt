@@ -16,14 +16,16 @@ internal fun overviewHours(count: Int): List<Instant> =
 internal fun overviewHourly(
     temperatures: List<Double?>,
     precipitations: List<Double?> = List(temperatures.size) { 0.0 },
-    timestamps: List<Instant> = overviewHours(temperatures.size)
+    timestamps: List<Instant> = overviewHours(temperatures.size),
+    humidity: List<Int?> = emptyList()
 ): HourlyForecast = HourlyForecast(
     timestamps = timestamps,
     temperature2m = temperatures,
     precipitation = precipitations,
     windSpeed10m = List(timestamps.size) { 10.0 },
     weatherCode = List(timestamps.size) { 1 },
-    cloudCover = List(timestamps.size) { 20 }
+    cloudCover = List(timestamps.size) { 20 },
+    relativeHumidity2m = humidity
 )
 
 internal fun overviewForecast(

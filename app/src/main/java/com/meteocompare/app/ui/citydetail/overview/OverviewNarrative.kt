@@ -133,6 +133,25 @@ private fun tomorrowTrend(
 }
 
 /** Prochain lever ou coucher du soleil dans les 24 h, s'il est connu. */
+/** Levers et couchers entre [start] et [end] inclus, dans l'ordre. */
+internal fun solarEventsBetween(forecast: CityForecast, start: Instant, end: Instant, zone: ZoneId): List<SolarEvent> {
+    val firstDay = start.atZone(zone).toLocalDate().minusDays(1)
+    val lastDay = end.atZone(zone).toLocalDate().plusDays(1)
+    return generateSequence(firstDay) { it.plusDays(1) }
+        .takeWhile { !it.isAfter(lastDay) }
+        .map { forecastSolarWindow(forecast, it) }
+        .flatMap { window ->
+            listOfNotNull(
+                window.sunrise?.let { SolarEvent(sunset = false, at = it) },
+                window.sunset?.let { SolarEvent(sunset = true, at = it) }
+            )
+        }
+        .filter { !it.at.isBefore(start) && !it.at.isAfter(end) }
+        .distinctBy { it.at }
+        .sortedBy { it.at }
+        .toList()
+}
+
 internal fun nextSolarEvent(forecast: CityForecast, now: Instant, zone: ZoneId): SolarEvent? {
     val today = now.atZone(zone).toLocalDate()
     val limit = now.plus(Duration.ofHours(24))

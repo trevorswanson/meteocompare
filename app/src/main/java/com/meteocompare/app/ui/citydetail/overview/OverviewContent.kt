@@ -18,6 +18,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
@@ -57,61 +59,68 @@ internal fun OverviewContent(
     nextHour: NextHourOutlook? = null,
     units: WeatherUnits = LocalWeatherUnits.current
 ) {
-    Column(
-        modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_SECTION),
-        verticalArrangement = Arrangement.spacedBy(28.dp)
-    ) {
-        RightNowSection(
-            model = model,
-            timezone = timezone,
-            currentTemp = currentTemp,
-            currentCondition = currentCondition,
-            currentIsNight = currentIsNight,
-            uvIndex = uvIndex,
-            solarWindow = solarWindow,
-            onWhyClick = onWhyClick,
-            units = units
-        )
-
-        nextHour?.let { NextHourSection(it) }
-
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            OverviewSectionTitle(stringResource(R.string.overview_next_24h_title))
-            val summary = narrativeText(model.narrative, timezone)
-            if (summary.isNotBlank()) {
-                Text(
-                    text = summary,
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.testTag(TAG_OVERVIEW_NARRATIVE)
-                )
-            }
-            HourlyOutlookChart(
-                points = model.hourly,
-                traces = model.temperatureTraces,
-                periods = model.periods,
+    // Une seule infobulle horaire à la fois ; tout toucher ailleurs la ferme.
+    val tooltipHost = remember { TimelineTooltipHost() }
+    CompositionLocalProvider(LocalTimelineTooltipHost provides tooltipHost) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .dismissTimelineTooltipOnTouch(tooltipHost)
+                .testTag(TAG_OVERVIEW_SECTION),
+            verticalArrangement = Arrangement.spacedBy(28.dp)
+        ) {
+            RightNowSection(
+                model = model,
                 timezone = timezone,
-                now = now,
+                currentTemp = currentTemp,
+                currentCondition = currentCondition,
+                currentIsNight = currentIsNight,
+                uvIndex = uvIndex,
+                solarWindow = solarWindow,
+                onWhyClick = onWhyClick,
                 units = units
             )
-        }
 
-        if (model.daily.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OverviewSectionTitle(stringResource(R.string.overview_next_days_title))
-                DailyOutlook(
-                    days = model.daily,
-                    ranges = model.dailyRanges,
+            nextHour?.let { NextHourSection(it) }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OverviewSectionTitle(stringResource(R.string.overview_next_24h_title))
+                val summary = narrativeText(model.narrative, timezone)
+                if (summary.isNotBlank()) {
+                    Text(
+                        text = summary,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.testTag(TAG_OVERVIEW_NARRATIVE)
+                    )
+                }
+                HourlyOutlookChart(
+                    points = model.hourly,
+                    traces = model.temperatureTraces,
                     timezone = timezone,
                     now = now,
-                    dayOutlookFor = dayOutlookFor,
+                    solarEvents = model.timelineSolarEvents,
                     units = units
                 )
             }
-        }
 
-        if (onModelDetailsClick != null) {
-            ModelDetailsLink(onClick = onModelDetailsClick)
+            if (model.daily.isNotEmpty()) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OverviewSectionTitle(stringResource(R.string.overview_next_days_title))
+                    DailyOutlook(
+                        days = model.daily,
+                        ranges = model.dailyRanges,
+                        timezone = timezone,
+                        now = now,
+                        dayOutlookFor = dayOutlookFor,
+                        units = units
+                    )
+                }
+            }
+
+            if (onModelDetailsClick != null) {
+                ModelDetailsLink(onClick = onModelDetailsClick)
+            }
         }
     }
 }

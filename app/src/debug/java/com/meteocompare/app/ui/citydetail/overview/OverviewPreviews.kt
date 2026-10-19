@@ -113,9 +113,9 @@ private fun OverviewComponentsPreview() {
             HourlyOutlookChart(
                 points = model.hourly,
                 traces = model.temperatureTraces,
-                periods = model.periods,
                 timezone = PreviewFixtures.city.timezone,
-                now = PreviewFixtures.now
+                now = PreviewFixtures.now,
+                solarEvents = model.timelineSolarEvents
             )
             DailyOutlook(days = model.daily, ranges = model.dailyRanges, timezone = PreviewFixtures.city.timezone, now = PreviewFixtures.now)
         }

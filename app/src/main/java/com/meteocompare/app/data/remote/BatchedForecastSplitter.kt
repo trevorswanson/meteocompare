@@ -153,7 +153,8 @@ object BatchedForecastSplitter {
             windDirection10m = get.ints(HourlyVar.WIND_DIRECTION_10M),
             precipitationProbability = get.ints(HourlyVar.PRECIPITATION_PROBABILITY),
             cloudCover = resolveCloudCover(get),
-            windGusts10m = get.doubles(HourlyVar.WIND_GUSTS_10M)
+            windGusts10m = get.doubles(HourlyVar.WIND_GUSTS_10M),
+            relativeHumidity2m = get.ints(HourlyVar.RELATIVE_HUMIDITY_2M)
         )
     }
 
@@ -320,6 +321,7 @@ object BatchedForecastSplitter {
 
     private object HourlyVar {
         const val TEMPERATURE_2M = "temperature_2m"
+        const val RELATIVE_HUMIDITY_2M = "relative_humidity_2m"
         const val PRECIPITATION = "precipitation"
         const val WIND_SPEED_10M = "wind_speed_10m"
         const val WEATHER_CODE = "weather_code"

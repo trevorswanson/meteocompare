@@ -33,6 +33,7 @@ class ForecastDataChainContractTest {
               "hourly": {
                 "time": ["2026-08-16T12:00"],
                 "temperature_2m_${key}": [21.1],
+                "relative_humidity_2m_${key}": [88],
                 "precipitation_${key}": [2.2],
                 "precipitation_probability_${key}": [33],
                 "cloud_cover_${key}": [44],
@@ -72,6 +73,7 @@ class ForecastDataChainContractTest {
         assertEquals(listOf(166), series.hourly.windDirection10m)
         assertEquals(listOf(77.7), series.hourly.windGusts10m)
         assertEquals(listOf(61), series.hourly.weatherCode)
+        assertEquals(listOf(88), series.hourly.relativeHumidity2m)
 
         assertEquals(listOf(LocalDate.of(2026, 8, 16)), series.daily.dates)
         assertEquals(listOf(28.1), series.daily.tempMax)
@@ -159,7 +161,7 @@ class ForecastDataChainContractTest {
     fun `contrat de variables API reste aligne avec les champs du pipeline`() {
         assertEquals(
             setOf(
-                "temperature_2m", "precipitation", "precipitation_probability",
+                "temperature_2m", "relative_humidity_2m", "precipitation", "precipitation_probability",
                 "cloud_cover", "cloud_cover_low", "cloud_cover_mid", "cloud_cover_high",
                 "wind_speed_10m", "wind_direction_10m",
                 "wind_gusts_10m", "weather_code"

@@ -298,10 +298,9 @@ private fun DayOutlookDetails(
             HourlyOutlookChart(
                 points = outlook.hourly,
                 traces = outlook.temperatureTraces,
-                periods = outlook.periods,
                 timezone = timezone,
                 now = now,
-                showLegend = false,
+                solarEvents = outlook.solarEvents,
                 units = units
             )
         }

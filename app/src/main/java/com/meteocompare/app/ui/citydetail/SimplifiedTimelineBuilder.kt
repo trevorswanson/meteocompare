@@ -13,6 +13,7 @@ import com.meteocompare.app.domain.usecase.ForecastConsensus
 import com.meteocompare.app.domain.usecase.ForecastEngineV3
 import com.meteocompare.app.domain.usecase.WeatherConditionConsensus
 import com.meteocompare.app.domain.util.dailyCloudCoverMean
+import com.meteocompare.app.domain.util.dewPointC
 import com.meteocompare.app.domain.util.resolveDailyCondition
 import com.meteocompare.app.domain.util.resolveHourlyCondition
 import java.time.Instant
@@ -117,6 +118,10 @@ internal data class SimplifiedTimelinePoint(
     val windGustModelCount: Int = 0,
     /** Direction d'origine du vent agrégée circulairement, en degrés météo. */
     val windDirectionDeg: Int? = null,
+    /** Humidité relative médiane (horaire seulement), 0-100 %. */
+    val relativeHumidityPercent: Int? = null,
+    /** Point de rosée médian (horaire seulement), en °C. */
+    val dewPointC: Double? = null,
     val condition: WeatherCondition? = null,
     /** UV from one location-based best-match forecast, not a model consensus. */
     val uvIndex: Double? = null,
@@ -267,7 +272,10 @@ private data class TimelineSnapshot(
     val windGust: Double?,
     val windDirection: Int?,
     val condition: WeatherCondition?,
-    val nativeCondition: WeatherCondition? = null
+    val nativeCondition: WeatherCondition? = null,
+    /** Horaire seulement : humidité relative et point de rosée de ce modèle. */
+    val relativeHumidity: Int? = null,
+    val dewPoint: Double? = null
 ) {
     val hasAnyValue: Boolean
         get() = temperature != null || tempMin != null || tempMax != null ||
@@ -292,6 +300,7 @@ private fun indexHourlySnapshots(
         val wind = series.hourly.windSpeed10m.getOrNull(index)
         val windGust = series.hourly.windGusts10m.getOrNull(index)
         val windDirection = series.hourly.windDirection10m.getOrNull(index)
+        val humidity = series.hourly.relativeHumidity2m.getOrNull(index)
         val nativeCondition = WeatherCondition.fromWmoCode(series.hourly.weatherCode.getOrNull(index))
             ?.takeUnless { it == WeatherCondition.UNKNOWN }
         val condition = nativeCondition ?: series.resolveHourlyCondition(index)
@@ -307,7 +316,10 @@ private fun indexHourlySnapshots(
             windGust = windGust,
             windDirection = windDirection,
             condition = condition,
-            nativeCondition = nativeCondition
+            nativeCondition = nativeCondition,
+            relativeHumidity = humidity,
+            // Chaque modèle avec sa propre température : pas de mélange entre modèles.
+            dewPoint = dewPointC(temperature, humidity)
         )
         if (snapshot.hasAnyValue) put(timestamp, snapshot)
     }
@@ -419,6 +431,16 @@ private fun timelinePoint(
         { it.cloudCover?.toDouble() }, ForecastEngineVariable.CLOUD, 10.0, 50.0,
         allowCalibration = false, min = 0.0, max = 100.0
     )
+
+    // Humidité et point de rosée : médiane équilibrée par lignée, sans moteur
+    // ni calibration (valeurs descriptives pour l'infobulle et « Maintenant »).
+    fun balancedMedian(extractor: (TimelineSnapshot) -> Double?): Double? = ForecastConsensus.continuous(
+        meaningful.mapNotNull { snap -> extractor(snap)?.let { ForecastConsensus.Entry(snap.model, it) } },
+        tightStdDev = 1.0,
+        wideStdDev = 10.0
+    ).central
+    val humidity = if (hourly) balancedMedian { it.relativeHumidity?.toDouble() } else null
+    val dewPoint = if (hourly) balancedMedian { it.dewPoint } else null
 
     val rainThreshold = if (hourly) HOURLY_RAIN_THRESHOLD_MM else DAILY_RAIN_THRESHOLD_MM
     val precipitationRows = meaningful.map { snap ->
@@ -589,6 +611,8 @@ private fun timelinePoint(
         windGustMaxAcrossModels = gustValues.maxOrNull(),
         windGustModelCount = gust.agreement.modelCount,
         windDirectionDeg = windDirection,
+        relativeHumidityPercent = humidity?.roundToInt()?.coerceIn(0, 100),
+        dewPointC = dewPoint,
         condition = conditionConsensus.value,
         modelCount = meaningful.size,
         familyCount = familyCount,

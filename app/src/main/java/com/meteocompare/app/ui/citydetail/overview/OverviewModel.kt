@@ -44,7 +44,9 @@ internal data class OverviewModel(
     val narrative: List<NarrativeSentence>,
     val solarEvent: SolarEvent?,
     /** Étendue min → max des lignées pour chaque jour (barres « autres modèles »). */
-    val dailyRanges: Map<LocalDate, DailyFamilyRange> = emptyMap()
+    val dailyRanges: Map<LocalDate, DailyFamilyRange> = emptyMap(),
+    /** Levers et couchers dans la fenêtre horaire (repères et nuit sur la courbe). */
+    val timelineSolarEvents: List<SolarEvent> = emptyList()
 ) {
     val today: SimplifiedTimelinePoint? get() = daily.firstOrNull()
     val hasRain: Boolean get() = precipitation.any(OverviewPrecipHour::isWet)
@@ -57,7 +59,8 @@ internal data class DayOutlook(
     val hourly: List<SimplifiedTimelinePoint>,
     val temperatureTraces: List<FamilyTrace>,
     val periods: List<PeriodSummary>,
-    val narrative: List<NarrativeSentence>
+    val narrative: List<NarrativeSentence>,
+    val solarEvents: List<SolarEvent> = emptyList()
 )
 
 internal fun buildOverviewModel(
@@ -89,7 +92,8 @@ internal fun buildOverviewModel(
             solarEvent = solarEvent
         ),
         solarEvent = solarEvent,
-        dailyRanges = buildDailyFamilyRanges(forecast)
+        dailyRanges = buildDailyFamilyRanges(forecast),
+        timelineSolarEvents = core.solarEvents
     )
 }
 
@@ -119,7 +123,8 @@ internal fun buildDayOutlook(
             today = date,
             solarEvent = sunset?.let { SolarEvent(sunset = true, at = it) },
             scope = OutlookScope.SINGLE_DAY
-        )
+        ),
+        solarEvents = core.solarEvents
     )
 }
 
@@ -127,7 +132,8 @@ private class HourlyCore(
     val hourly: List<SimplifiedTimelinePoint>,
     val traces: List<FamilyTrace>,
     val precipitation: List<OverviewPrecipHour>,
-    val periods: List<PeriodSummary>
+    val periods: List<PeriodSummary>,
+    val solarEvents: List<SolarEvent>
 )
 
 private fun hourlyCore(
@@ -162,6 +168,9 @@ private fun hourlyCore(
         hourly = hourlyPoints,
         traces = temperatureTraces,
         precipitation = precipitation,
-        periods = buildPeriodSummaries(hourlyPoints, precipitation, zone, scope)
+        periods = buildPeriodSummaries(hourlyPoints, precipitation, zone, scope),
+        solarEvents = if (timestamps.isEmpty()) emptyList() else {
+            solarEventsBetween(forecast, timestamps.first(), timestamps.last(), zone)
+        }
     )
 }
