@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Thermostat
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -64,8 +65,8 @@ import java.util.Locale
 /**
  * « Maintenant » : grande icône, température actuelle, condition et
  * max/min du jour, et la pastille de convergence des modèles (qui ouvre
- * l’explication). « Plus » déplie vent, nuages, humidité, point de rosée, UV
- * et soleil.
+ * l’explication). La flèche en bas à droite déplie vent, nuages, humidité,
+ * point de rosée, UV et soleil.
  */
 @Composable
 internal fun RightNowSection(
@@ -87,8 +88,8 @@ internal fun RightNowSection(
     val highLow = if (today?.tempMaxC != null || today?.tempMinC != null) {
         stringResource(
             R.string.overview_high_low,
-            units.temp(today?.tempMaxC, locale = locale),
-            units.temp(today?.tempMinC, locale = locale)
+            units.temp(today.tempMaxC, locale = locale),
+            units.temp(today.tempMinC, locale = locale)
         )
     } else null
     val nowLabel = currentTemp?.let { stringResource(R.string.overview_now_a11y, units.temp(it, locale = locale)) }
@@ -136,18 +137,17 @@ internal fun RightNowSection(
                             HighLowLine(
                                 icon = Icons.Filled.ArrowUpward,
                                 tint = temperatureMetricAccent(),
-                                text = units.degrees(today?.tempMaxC, locale)
+                                text = units.degrees(today.tempMaxC, locale)
                             )
                             HighLowLine(
                                 icon = Icons.Filled.ArrowDownward,
                                 tint = temperatureMinMetricAccent(),
-                                text = units.degrees(today?.tempMinC, locale)
+                                text = units.degrees(today.tempMinC, locale)
                             )
                         }
                     }
                 }
                 conditionLabel?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-                MoreToggle(expanded = showMore, onToggle = { showMore = !showMore })
             }
         }
         AnimatedVisibility(visible = showMore) {
@@ -160,6 +160,12 @@ internal fun RightNowSection(
                 locale = locale
             )
         }
+        // Flèche seule, en bas à droite du panneau : déplie vent, nuages, UV…
+        MoreToggle(
+            expanded = showMore,
+            onToggle = { showMore = !showMore },
+            modifier = Modifier.align(Alignment.End)
+        )
     }
 }
 
@@ -173,25 +179,13 @@ private fun HighLowLine(icon: ImageVector, tint: Color, text: String) {
 }
 
 @Composable
-private fun MoreToggle(expanded: Boolean, onToggle: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .padding(top = 4.dp)
-            .clickable(role = Role.Button, onClick = onToggle)
-            .padding(vertical = 4.dp)
-            .testTag(TAG_OVERVIEW_MORE),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = stringResource(if (expanded) R.string.overview_less else R.string.overview_more),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.primary
-        )
+private fun MoreToggle(expanded: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(onClick = onToggle, modifier = modifier.testTag(TAG_OVERVIEW_MORE)) {
         Icon(
             imageVector = if (expanded) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(20.dp)
+            // Le libellé reste pour TalkBack : « Plus » / « Moins ».
+            contentDescription = stringResource(if (expanded) R.string.overview_less else R.string.overview_more),
+            tint = MaterialTheme.colorScheme.primary
         )
     }
 }

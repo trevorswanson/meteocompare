@@ -1089,7 +1089,7 @@ dato</string>
     <string name="overview_when_in_the_afternoon">nel pomeriggio</string>
     <string name="overview_when_in_the_evening">in serata</string>
     <string name="overview_daily_models_range_a11y">Le altre previsioni vanno da %1$s a %2$s</string>
-    <string name="home_tab_weather">Meteo</string>
+    <string name="home_tab_weather">Previsioni</string>
     <string name="home_tab_radar">Radar</string>
     <string name="home_tab_charts">Grafici</string>
 </resources>

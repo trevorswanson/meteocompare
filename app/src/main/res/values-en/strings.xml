@@ -1103,7 +1103,7 @@
     <string name="overview_when_in_the_afternoon">in the afternoon</string>
     <string name="overview_when_in_the_evening">in the evening</string>
     <string name="overview_daily_models_range_a11y">Other forecasts range from %1$s to %2$s</string>
-    <string name="home_tab_weather">Weather</string>
+    <string name="home_tab_weather">Forecast</string>
     <string name="home_tab_radar">Radar</string>
     <string name="home_tab_charts">Charts</string>
 </resources>
