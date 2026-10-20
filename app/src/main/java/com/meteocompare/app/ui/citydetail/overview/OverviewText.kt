@@ -127,7 +127,6 @@ internal fun narrativeText(sentences: List<NarrativeSentence>, timezone: String?
                     else -> R.string.overview_narrative_tomorrow_cooler
                 }
             )
-            )
         }
     }.joinToString(" ")
 }
