@@ -936,10 +936,6 @@ Daten</string>
     <string name="radar_mode">Radarmodus</string>
     <string name="radar_observation">Beobachtungen</string>
     <string name="radar_projection">Projektion</string>
-    <string name="radar_range">Radarbereich</string>
-    <string name="radar_range_near">Nah</string>
-    <string name="radar_range_regional">Regional</string>
-    <string name="radar_range_wide">Weit</string>
     <string name="radar_unavailable">Regenradar ist vorübergehend nicht verfügbar.</string>
     <string name="radar_observed_window">Radarbeobachtungen · letzte 2 Stunden</string>
     <string name="radar_projection_ready">Projektion bereit</string>
@@ -961,8 +957,8 @@ Daten</string>
     <string name="radar_impact_approaching">%1$s nähert sich dem Ort, ohne dass innerhalb einer Stunde ein direkter Treffer erkannt wurde.</string>
     <string name="radar_reading_title">Lesart</string>
     <string name="radar_reading_body">Der Beobachtungsmodus animiert die letzten 2 Stunden. Im Projektionsmodus zeigen +15, +30, +45 oder +60 Minuten den projizierten Umriss, den wahrscheinlichen Bereich und die Zugbahn.</string>
-    <string name="radar_privacy_note">Das Radar kontaktiert RainViewer und OpenStreetMap nur beim Öffnen. Die Koordinaten des Ortes dienen zum Zentrieren des Radarbilds.</string>
-    <string name="radar_attribution_osm">© OpenStreetMap contributors</string>
+    <string name="radar_privacy_note">Das Radar kontaktiert RainViewer und OpenFreeMap nur beim Öffnen. Die Koordinaten des Ortes dienen zum Zentrieren des Radarbilds.</string>
+    <string name="radar_attribution_osm">OpenFreeMap © OpenMapTiles © OpenStreetMap</string>
     <string name="radar_attribution_rainviewer">Wetterradar von RainViewer</string>
     <string name="radar_recalculation_failed">Die Neuberechnung ist fehlgeschlagen; die letzte verfügbare Projektion bleibt erhalten.</string>
     <string name="radar_intensity">Intensität</string>

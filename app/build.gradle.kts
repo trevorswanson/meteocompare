@@ -60,6 +60,9 @@ android {
         forkBuildNumber?.let { build ->
             versionCode = forkVersionCodeBase + build
             versionName += "-fork.$build"
+            // Téléphones uniquement : les bibliothèques natives MapLibre x86
+            // (émulateurs) alourdiraient l'APK publié d'une dizaine de Mo.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
         testInstrumentationRunner = "com.meteocompare.app.HiltTestRunner"
         buildConfigField("String", "METEOCOMPARE_BASE_URL", "\"$vigilanceBaseUrl\"")
@@ -212,6 +215,9 @@ dependencies {
     ksp(libs.hilt.compiler)
 
     implementation(libs.bundles.network)
+
+    // Carte radar zoomable (fond OpenFreeMap + couches RainViewer).
+    implementation(libs.maplibre.android)
     implementation(libs.kotlinx.coroutines.android)
 
     implementation(libs.androidx.datastore.preferences)

@@ -2,7 +2,6 @@ package com.meteocompare.app.testutil
 
 import com.meteocompare.app.data.radar.RadarRepository
 import com.meteocompare.app.domain.model.City
-import com.meteocompare.app.domain.radar.RadarBaseTile
 import com.meteocompare.app.domain.radar.RadarFrame
 import com.meteocompare.app.domain.radar.RadarImage
 import com.meteocompare.app.domain.radar.RadarMetadata
@@ -21,7 +20,6 @@ class FakeRadarRepository @Inject constructor() : RadarRepository {
 
     val metadataForceFlags = mutableListOf<Boolean>()
     val radarZooms = mutableListOf<Int>()
-    val baseZooms = mutableListOf<Int>()
 
     override suspend fun metadata(forceRefresh: Boolean): RadarMetadata {
         metadataForceFlags += forceRefresh
@@ -42,14 +40,8 @@ class FakeRadarRepository @Inject constructor() : RadarRepository {
         return transparentImage
     }
 
-    override suspend fun baseTiles(city: City, zoom: Int, viewportWidth: Int, viewportHeight: Int): List<RadarBaseTile> {
-        baseZooms += zoom
-        return emptyList()
-    }
-
     fun reset() {
         metadataForceFlags.clear()
         radarZooms.clear()
-        baseZooms.clear()
     }
 }

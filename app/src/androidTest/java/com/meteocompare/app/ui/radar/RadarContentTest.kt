@@ -11,9 +11,7 @@ import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.radar.RadarFrame
 import com.meteocompare.app.domain.radar.RadarMetadata
 import com.meteocompare.app.domain.radar.RadarMode
-import com.meteocompare.app.domain.radar.RadarRange
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 
@@ -67,23 +65,6 @@ class RadarContentTest {
     }
 
     @Test
-    fun radar_stage_reports_its_real_viewport_for_tile_selection() {
-        var width = 0
-        var height = 0
-        composeRule.setContent {
-            MaterialTheme {
-                RadarContent(
-                    state = readyState(),
-                    onViewportSize = { w, h -> width = w; height = h }
-                )
-            }
-        }
-        composeRule.waitForIdle()
-        assertTrue(width > 0)
-        assertTrue(height > 0)
-    }
-
-    @Test
     fun observation_and_recalculate_actions_are_accessible() {
         var recalculated = false
         composeRule.setContent {
@@ -101,22 +82,14 @@ class RadarContentTest {
 
 
     @Test
-    fun fullscreen_keeps_range_and_projection_controls_available() {
-        var selectedRange: RadarRange? = null
+    fun fullscreen_keeps_projection_controls_available() {
         composeRule.setContent {
             MaterialTheme {
-                RadarContent(
-                    state = readyState().copy(mode = RadarMode.PROJECTION, isFullscreen = true),
-                    onRangeChange = { selectedRange = it }
-                )
+                RadarContent(state = readyState().copy(mode = RadarMode.PROJECTION, isFullscreen = true))
             }
         }
 
-        RadarRange.entries.forEach { range ->
-            composeRule.onNodeWithTag(radarRangeTag(range)).assertExists()
-        }
-        composeRule.onNodeWithTag(radarRangeTag(RadarRange.WIDE)).performClick()
-        assertEquals(RadarRange.WIDE, selectedRange)
+        composeRule.onNodeWithTag(TAG_RADAR_STAGE).assertExists()
         composeRule.onNodeWithTag(TAG_RADAR_RECALCULATE).assertExists()
     }
 
@@ -148,8 +121,6 @@ class RadarContentTest {
             past = listOf(RadarFrame(1_700_000_000, "/v2/radar/a"), RadarFrame(1_700_000_600, "/v2/radar/b"))
         ),
         frames = listOf(RadarFrame(1_700_000_000, "/v2/radar/a"), RadarFrame(1_700_000_600, "/v2/radar/b")),
-        selectedFrameIndex = 1,
-        displayImage = null,
-        baseTiles = emptyList()
+        selectedFrameIndex = 1
     )
 }

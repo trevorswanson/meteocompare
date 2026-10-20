@@ -953,10 +953,6 @@
     <string name="radar_mode">Radar mode</string>
     <string name="radar_observation">Observations</string>
     <string name="radar_projection">Projection</string>
-    <string name="radar_range">Radar range</string>
-    <string name="radar_range_near">Near</string>
-    <string name="radar_range_regional">Regional</string>
-    <string name="radar_range_wide">Wide</string>
     <string name="radar_unavailable">Rain radar is temporarily unavailable.</string>
     <string name="radar_observed_window">Radar observations · last 2 hours</string>
     <string name="radar_projection_ready">Projection ready</string>
@@ -978,8 +974,8 @@
     <string name="radar_impact_approaching">%1$s is approaching the locality without a direct impact identified within the hour.</string>
     <string name="radar_reading_title">How to read it</string>
     <string name="radar_reading_body">Observation mode animates the last 2 hours. In Projection mode, choose +15, +30, +45 or +60 minutes: the map shows the projected contour, its probable envelope and the path from the latest observation.</string>
-    <string name="radar_privacy_note">The radar contacts RainViewer and OpenStreetMap only when opened. The locality coordinates are used to centre the radar image.</string>
-    <string name="radar_attribution_osm">© OpenStreetMap contributors</string>
+    <string name="radar_privacy_note">The radar contacts RainViewer and OpenFreeMap only when opened. The locality coordinates are used to centre the radar image.</string>
+    <string name="radar_attribution_osm">OpenFreeMap © OpenMapTiles © OpenStreetMap</string>
     <string name="radar_attribution_rainviewer">Weather radar by RainViewer</string>
     <string name="radar_recalculation_failed">Recalculation failed; the last available projection is kept.</string>
     <string name="radar_intensity">Intensity</string>

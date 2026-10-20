@@ -69,25 +69,19 @@ class RadarRepositoryTest {
     }
 
     @Test
-    fun `base map requests only cover the visible viewport like the web radar`() {
-        val phone = baseTileRequests(city, zoom = 9, viewportWidth = 360, viewportHeight = 360)
-        val expanded = baseTileRequests(city, zoom = 9, viewportWidth = 1200, viewportHeight = 800)
-
-        assertEquals(6, phone.size)
-        assertEquals(20, expanded.size)
-        assertTrue(phone.all { it.x in 0 until (1 shl 9) && it.y in 0 until (1 shl 9) })
-        assertEquals(phone.size, phone.map { it.url }.toSet().size)
-        assertTrue(phone.any { it.leftFromCenter <= 0 && it.leftFromCenter + 256 >= 0 })
-        assertTrue(phone.any { it.topFromCenter <= 0 && it.topFromCenter + 256 >= 0 })
-        assertTrue(phone.size < 25)
+    fun `radar tile template keeps the colour scheme and leaves z x y to the map`() {
+        val metadata = RadarMetadata("https://tilecache.rainviewer.com", listOf(RadarFrame(1, "/v2/radar/test")))
+        assertEquals(
+            "https://tilecache.rainviewer.com/v2/radar/test/256/{z}/{x}/{y}/2/0_1.png",
+            radarTileUrlTemplate(metadata, metadata.past.single())
+        )
     }
 
     @Test
     fun `radar caches are bounded for mobile memory pressure`() {
-        // 512x512 ARGB images are ~1 MiB each; 256x256 OSM tiles are ~256 KiB.
-        // These limits keep the theoretical pixel payload around 24 MiB.
+        // 512x512 ARGB analysis images are ~1 MiB each: about 16 MiB at most.
+        // Map tiles are cached by MapLibre itself.
         assertEquals(16, FRAME_CACHE_SIZE)
-        assertEquals(32, TILE_CACHE_SIZE)
     }
 
     @Test

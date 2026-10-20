@@ -13,7 +13,7 @@ import com.meteocompare.app.domain.radar.RadarMaskSample
 import com.meteocompare.app.domain.radar.RadarMode
 import com.meteocompare.app.domain.radar.RadarNowcast
 import com.meteocompare.app.domain.radar.RadarRainCell
-import com.meteocompare.app.domain.radar.RadarRange
+import com.meteocompare.app.domain.radar.RADAR_WIDE_ANALYSIS_ZOOM
 import com.meteocompare.app.domain.radar.estimateRainCellMotions
 import com.meteocompare.app.domain.radar.evaluateRainCellLocalityImpact
 import com.meteocompare.app.domain.radar.filterPeripheralRainCells
@@ -37,7 +37,6 @@ import kotlinx.coroutines.withContext
 
 private const val RADAR_FRAME_DELAY_MS = 700L
 private const val RADAR_MODE_STATE = "radar.mode"
-private const val RADAR_RANGE_STATE = "radar.range"
 private const val RADAR_HORIZON_STATE = "radar.horizon"
 private const val RADAR_FULLSCREEN_STATE = "radar.fullscreen"
 
@@ -52,9 +51,6 @@ class RadarViewModel @Inject constructor(
     private val persistedMode: RadarMode
         get() = savedStateHandle.get<String>(RADAR_MODE_STATE)
             ?.let { runCatching { RadarMode.valueOf(it) }.getOrNull() } ?: RadarMode.OBSERVATION
-    private val persistedRange: RadarRange
-        get() = savedStateHandle.get<String>(RADAR_RANGE_STATE)
-            ?.let { runCatching { RadarRange.valueOf(it) }.getOrNull() } ?: RadarRange.NEAR
     private val persistedHorizon: Int
         get() = savedStateHandle.get<Int>(RADAR_HORIZON_STATE)
             ?.takeIf { it in RADAR_PROJECTION_HORIZONS } ?: 30
@@ -64,16 +60,12 @@ class RadarViewModel @Inject constructor(
     val state: StateFlow<RadarUiState> = _state.asStateFlow()
 
     private var playbackJob: Job? = null
-    private var imageJob: Job? = null
-    private var baseJob: Job? = null
     private var analysisJob: Job? = null
     private var coverageJob: Job? = null
     private var loadJob: Job? = null
     private var identityRegistry: List<RadarIdentityRegistryEntry> = emptyList()
     private var nextCellId = 1
-    private val coverageRanges = mutableSetOf<RadarRange>()
-    private var viewportWidth = 0
-    private var viewportHeight = 0
+    private var wideCoverageLoaded = false
 
     init { load() }
 
@@ -86,17 +78,6 @@ class RadarViewModel @Inject constructor(
         val nextIndex = if (mode == RadarMode.PROJECTION) current.frames.lastIndex else current.selectedFrameIndex
         _state.value = current.copy(mode = mode, selectedFrameIndex = nextIndex, isPlaying = false)
         savedStateHandle[RADAR_MODE_STATE] = mode.name
-        loadDisplayImage()
-    }
-
-    fun setRange(range: RadarRange) {
-        val current = _state.value as? RadarUiState.Ready ?: return
-        if (current.range == range) return
-        _state.value = current.copy(range = range, isBaseLoading = viewportWidth > 0 && viewportHeight > 0)
-        savedStateHandle[RADAR_RANGE_STATE] = range.name
-        if (viewportWidth > 0 && viewportHeight > 0) loadBaseTiles()
-        loadDisplayImage()
-        if (range == RadarRange.WIDE) augmentWideCoverage()
     }
 
     fun setHorizon(minutes: Int) {
@@ -118,7 +99,6 @@ class RadarViewModel @Inject constructor(
             isPlaying = false
         )
         savedStateHandle[RADAR_MODE_STATE] = RadarMode.OBSERVATION.name
-        loadDisplayImage()
     }
 
     fun togglePlayback() {
@@ -135,7 +115,6 @@ class RadarViewModel @Inject constructor(
             isPlaying = true
         )
         savedStateHandle[RADAR_MODE_STATE] = RadarMode.OBSERVATION.name
-        loadDisplayImage()
         playbackJob = viewModelScope.launch {
             while (true) {
                 delay(RADAR_FRAME_DELAY_MS)
@@ -146,7 +125,6 @@ class RadarViewModel @Inject constructor(
                     break
                 }
                 _state.value = ready.copy(selectedFrameIndex = ready.selectedFrameIndex + 1)
-                loadDisplayImage()
             }
         }
     }
@@ -156,22 +134,6 @@ class RadarViewModel @Inject constructor(
         val fullscreen = !current.isFullscreen
         _state.value = current.copy(isFullscreen = fullscreen)
         savedStateHandle[RADAR_FULLSCREEN_STATE] = fullscreen
-    }
-
-    /**
-     * The web implementation only requests OSM tiles intersecting the visible map.
-     * Compose reports its viewport in dp-equivalent map pixels so Android can use
-     * the exact same tile-selection rule and avoid a fixed 5×5 over-fetch.
-     */
-    fun setViewportSize(width: Int, height: Int) {
-        val safeWidth = width.coerceAtLeast(280)
-        val safeHeight = height.coerceAtLeast(180)
-        if (safeWidth == viewportWidth && safeHeight == viewportHeight) return
-        viewportWidth = safeWidth
-        viewportHeight = safeHeight
-        val current = _state.value as? RadarUiState.Ready ?: return
-        _state.value = current.copy(isBaseLoading = true)
-        loadBaseTiles()
     }
 
     fun recalculateProjection() {
@@ -193,7 +155,7 @@ class RadarViewModel @Inject constructor(
         )
         identityRegistry = emptyList()
         nextCellId = 1
-        coverageRanges.clear()
+        wideCoverageLoaded = false
         analysisJob = viewModelScope.launch {
             val previous = current
             try {
@@ -202,10 +164,8 @@ class RadarViewModel @Inject constructor(
                 _state.value = ready.copy(
                     metadata = metadata,
                     frames = metadata.past,
-                    selectedFrameIndex = metadata.past.lastIndex,
-                    displayImage = null
+                    selectedFrameIndex = metadata.past.lastIndex
                 )
-                loadDisplayImage()
                 analyzeNowcastInternal()
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -229,12 +189,10 @@ class RadarViewModel @Inject constructor(
     private fun load(forceRefresh: Boolean = false) {
         loadJob?.cancel()
         stopPlayback()
-        imageJob?.cancel()
-        baseJob?.cancel()
         analysisJob?.cancel()
         coverageJob?.cancel()
         coverageJob = null
-        coverageRanges.clear()
+        wideCoverageLoaded = false
         _state.value = RadarUiState.Loading
         loadJob = viewModelScope.launch {
             try {
@@ -251,24 +209,14 @@ class RadarViewModel @Inject constructor(
                     metadata = metadata,
                     frames = frames,
                     selectedFrameIndex = if (mode == RadarMode.PROJECTION) frames.lastIndex else 0,
-                    displayImage = null,
-                    baseTiles = emptyList(),
-                    range = persistedRange,
                     mode = mode,
                     horizonMinutes = persistedHorizon,
-                    isImageLoading = true,
-                    isBaseLoading = true,
                     isAnalyzing = true,
                     isFullscreen = persistedFullscreen
                 )
-                // togglePlayback() already loads the first frame. Starting it here
-                // as well would cancel the first OkHttp call and download the
-                // same frame twice on initial entry to the radar screen.
-                if (mode == RadarMode.OBSERVATION && frames.size > 1) {
-                    togglePlayback()
-                } else {
-                    loadDisplayImage()
-                }
+                // La carte charge elle-même les tuiles radar de chaque image :
+                // le ViewModel ne télécharge que les images d'analyse.
+                if (mode == RadarMode.OBSERVATION && frames.size > 1) togglePlayback()
                 analyzeNowcast()
             } catch (cancellation: CancellationException) {
                 throw cancellation
@@ -282,55 +230,6 @@ class RadarViewModel @Inject constructor(
         playbackJob?.cancel()
         playbackJob = null
         _state.update { current -> if (current is RadarUiState.Ready && current.isPlaying) current.copy(isPlaying = false) else current }
-    }
-
-    private fun loadDisplayImage() {
-        imageJob?.cancel()
-        val current = _state.value as? RadarUiState.Ready ?: return
-        val frame = current.frames.getOrNull(current.selectedFrameIndex) ?: return
-        val zoom = current.range.radarZoom
-        _state.value = current.copy(isImageLoading = true)
-        imageJob = viewModelScope.launch {
-            try {
-                val image = radarRepository.radarImage(current.metadata, frame, current.city, zoom)
-                _state.update { state ->
-                    if (state is RadarUiState.Ready &&
-                        state.selectedFrame.timeEpochSeconds == frame.timeEpochSeconds && state.range.radarZoom == zoom
-                    ) state.copy(displayImage = image, isImageLoading = false) else state
-                }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                _state.update { state -> if (state is RadarUiState.Ready) state.copy(isImageLoading = false) else state }
-            }
-        }
-    }
-
-    private fun loadBaseTiles() {
-        baseJob?.cancel()
-        val current = _state.value as? RadarUiState.Ready ?: return
-        if (viewportWidth <= 0 || viewportHeight <= 0) return
-        val zoom = current.range.mapZoom
-        val width = viewportWidth
-        val height = viewportHeight
-        baseJob = viewModelScope.launch {
-            try {
-                val tiles = radarRepository.baseTiles(current.city, zoom, width, height)
-                _state.update { state ->
-                    if (state is RadarUiState.Ready && state.range.mapZoom == zoom &&
-                        viewportWidth == width && viewportHeight == height
-                    ) state.copy(baseTiles = tiles, isBaseLoading = false) else state
-                }
-            } catch (cancellation: CancellationException) {
-                throw cancellation
-            } catch (_: Exception) {
-                _state.update { state ->
-                    if (state is RadarUiState.Ready && state.range.mapZoom == zoom) {
-                        state.copy(isBaseLoading = false)
-                    } else state
-                }
-            }
-        }
     }
 
     private fun analyzeNowcast() {
@@ -377,7 +276,8 @@ class RadarViewModel @Inject constructor(
                     isAnalyzing = false
                 ) else state
             }
-            if ((_state.value as? RadarUiState.Ready)?.range == RadarRange.WIDE) augmentWideCoverage()
+            // Carte zoomable : les cellules lointaines servent dès qu'on dézoome.
+            augmentWideCoverage()
         } catch (cancellation: CancellationException) {
             throw cancellation
         } catch (_: Exception) {
@@ -386,23 +286,23 @@ class RadarViewModel @Inject constructor(
     }
 
     private fun augmentWideCoverage() {
-        if (RadarRange.WIDE in coverageRanges || coverageJob?.isActive == true) return
+        if (wideCoverageLoaded || coverageJob?.isActive == true) return
         val current = _state.value as? RadarUiState.Ready ?: return
-        if (current.range != RadarRange.WIDE || current.nowcast == null || current.isAnalyzing) return
+        if (current.nowcast == null || current.isAnalyzing) return
         coverageJob = viewModelScope.launch {
             try {
                 val frames = recentRadarFrameIndices(current.frames.size, 7).mapNotNull(current.frames::getOrNull)
                 val images = frames.map { frame ->
-                    frame to radarRepository.radarImage(current.metadata, frame, current.city, RadarRange.WIDE.radarZoom)
+                    frame to radarRepository.radarImage(current.metadata, frame, current.city, RADAR_WIDE_ANALYSIS_ZOOM)
                 }
                 val samples = withContext(computationDispatcher) {
                     images.map { (frame, image) -> RadarMaskSample(radarMaskFromArgb(image), frame.timeEpochSeconds) }
                 }
                 val peripheral = withContext(computationDispatcher) {
                     filterPeripheralRainCells(
-                        estimateRainCellMotions(samples).map { it.copy(analysisZoom = RadarRange.WIDE.radarZoom) },
+                        estimateRainCellMotions(samples).map { it.copy(analysisZoom = RADAR_WIDE_ANALYSIS_ZOOM) },
                         latitude = current.city.latitude,
-                        radarZoom = RadarRange.WIDE.radarZoom
+                        radarZoom = RADAR_WIDE_ANALYSIS_ZOOM
                     )
                 }
                 if (peripheral.isNotEmpty()) {
@@ -411,7 +311,7 @@ class RadarViewModel @Inject constructor(
                             peripheral,
                             identityRegistry,
                             current.city.latitude,
-                            RadarRange.WIDE.radarZoom,
+                            RADAR_WIDE_ANALYSIS_ZOOM,
                             samples.last().timeEpochSeconds,
                             nextCellId
                         )
@@ -432,7 +332,7 @@ class RadarViewModel @Inject constructor(
                         }
                     }
                 }
-                coverageRanges += RadarRange.WIDE
+                wideCoverageLoaded = true
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (_: Exception) {

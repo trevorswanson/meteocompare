@@ -15,7 +15,7 @@ coordonnées des lieux consultés sont envoyées aux API météo Open-Meteo. Pou
 Vigilance française, un code de département peut être envoyé au Worker public
 MeteoCompare. Lorsque l’utilisateur ouvre explicitement le radar pluie, les
 coordonnées de la localité sont également utilisées pour charger les images
-RainViewer et les tuiles cartographiques OpenStreetMap.
+RainViewer et les tuiles cartographiques OpenFreeMap (données OpenStreetMap).
 
 ---
 
@@ -107,7 +107,7 @@ Les villes hors France ne déclenchent aucun appel Vigilance. Lorsqu'une ville e
 supprimée des favoris, son état Vigilance en mémoire est supprimé et le cache
 persistant correspondant est purgé conformément au fonctionnement de l'application.
 
-## 4. Radar pluie : RainViewer et OpenStreetMap
+## 4. Radar pluie : RainViewer et OpenFreeMap
 
 La vue radar est optionnelle et ne contacte ces services qu'après son ouverture
 explicite depuis la fiche d'une ville.
@@ -115,10 +115,12 @@ explicite depuis la fiche d'une ville.
 - **RainViewer** fournit les métadonnées et images des observations radar. Les
   coordonnées (latitude et longitude) de la localité consultée sont incluses dans
   la requête d'image afin de centrer la carte radar.
-- **OpenStreetMap** fournit uniquement les tuiles du fond cartographique nécessaires
-  à la zone affichée. Les tuiles déjà consultées sont conservées dans un cache HTTP
-  local afin d'éviter de les télécharger inutilement à chaque ouverture. Ce cache
-  respecte les directives HTTP du serveur et peut être purgé par Android.
+- **OpenFreeMap** fournit uniquement les tuiles vectorielles du fond cartographique
+  (données OpenStreetMap) nécessaires à la zone affichée. La carte MapLibre conserve
+  les tuiles consultées dans son cache local selon les directives HTTP du serveur ;
+  ce cache peut être purgé par Android.
+- Les **tuiles radar RainViewer** de la zone affichée sont demandées par la carte
+  sans coordonnées de localité : seules les tuiles {z}/{x}/{y} visibles le sont.
 
 Comme pour toute requête HTTPS, ces services reçoivent aussi l'adresse IP source
 et les informations HTTP techniques nécessaires à l'acheminement. MeteoCompare
@@ -142,7 +144,7 @@ Les données suivantes sont conservées localement par MeteoCompare :
 | Langue de l'application | SharedPreferences interne | Choisir la langue de l'interface et des recherches | Le code de langue peut être envoyé au géocodage pour localiser les résultats |
 | Cache de prévisions et historiques de calcul | Room SQLite | Démarrage rapide, mode hors-ligne, comparaisons | Le contenu du cache n'est pas téléversé comme tel |
 | Cache Vigilance | DataStore Preferences | Limiter les appels réseau et fournir un fallback court | Non comme cache ; de nouvelles requêtes peuvent être faites au Worker |
-| Cache HTTP radar/cartographie | `cacheDir` Android (OkHttp, 64 MiB max) | Réutiliser les réponses HTTP et les tuiles OSM selon leurs en-têtes de cache | Non comme cache ; seules les requêtes manquantes ou expirées repartent vers RainViewer / OpenStreetMap |
+| Cache HTTP radar/cartographie | `cacheDir` Android (OkHttp, 64 MiB max) | Réutiliser les réponses HTTP RainViewer (analyse) selon leurs en-têtes de cache ; MapLibre garde son propre cache de tuiles | Non comme cache ; seules les requêtes manquantes ou expirées repartent vers RainViewer / OpenFreeMap |
 | Préférences des widgets | DataStore Glance | Conserver ville, couleurs et options du widget | La ville configurée peut déclencher les mêmes requêtes météo qu'à l'intérieur de l'app |
 
 La phrase « stocké localement » signifie que MeteoCompare ne synchronise pas ces
@@ -176,7 +178,7 @@ réglages du compte de l'utilisateur.
 
 | Permission | Utilité |
 |---|---|
-| `INTERNET` | Appels HTTPS vers Open-Meteo, le Worker MeteoCompare, RainViewer et OpenStreetMap |
+| `INTERNET` | Appels HTTPS vers Open-Meteo, le Worker MeteoCompare, RainViewer et OpenFreeMap |
 | `ACCESS_NETWORK_STATE` | Détecter l'absence de réseau et adapter l'interface / les requêtes |
 | `RECEIVE_BOOT_COMPLETED` | Reprogrammer proprement l'actualisation périodique des widgets après un redémarrage ou une mise à jour de l'application |
 | `POST_NOTIFICATIONS` | Afficher les notifications météo locales (résumé quotidien, divergence des modèles, changement de prévision), uniquement si l'utilisateur les active dans les Réglages. Elles sont calculées sur l'appareil : aucun service de push, aucun identifiant ni donnée supplémentaire n'est transmis |

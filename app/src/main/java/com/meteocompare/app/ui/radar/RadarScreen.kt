@@ -3,7 +3,6 @@ package com.meteocompare.app.ui.radar
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.locale.WeatherTimeFormat
 
-import android.graphics.Bitmap
 import android.graphics.Paint as AndroidPaint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -54,21 +53,13 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ColorMatrix
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.PathFillType
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -78,13 +69,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.meteocompare.app.R
 import com.meteocompare.app.domain.radar.RADAR_PROJECTION_HORIZONS
 import com.meteocompare.app.domain.radar.RadarImpactKind
-import com.meteocompare.app.domain.radar.RadarImage
 import com.meteocompare.app.domain.radar.RadarMode
 import com.meteocompare.app.domain.radar.RadarRainCell
-import com.meteocompare.app.domain.radar.RadarRange
 import com.meteocompare.app.domain.radar.mapResolutionKm
 import com.meteocompare.app.domain.radar.projectRainCell
-import com.meteocompare.app.domain.radar.radarNowcastDisplayGeometry
 import com.meteocompare.app.domain.radar.rainCellContours
 import java.time.Instant
 import java.time.ZoneId
@@ -103,7 +91,6 @@ internal const val TAG_RADAR_RECALCULATE = "radar_recalculate"
 internal const val RADAR_OBSERVATION_ALPHA = .80f
 internal const val RADAR_PROJECTION_OBSERVATION_ALPHA = .38f
 internal fun radarHorizonTag(minutes: Int) = "radar_horizon_$minutes"
-internal fun radarRangeTag(range: RadarRange) = "radar_range_${range.name.lowercase()}"
 
 private val CELL_COLORS = listOf(
     Color(0xFF0EA5E9), Color(0xFF8B5CF6), Color(0xFFF97316), Color(0xFF10B981),
@@ -155,12 +142,10 @@ fun RadarScreen(
             state = state,
             onRetry = viewModel::retry,
             onModeChange = viewModel::setMode,
-            onRangeChange = viewModel::setRange,
             onHorizonChange = viewModel::setHorizon,
             onFrameChange = viewModel::selectFrame,
             onPlayPause = viewModel::togglePlayback,
             onRecalculate = viewModel::recalculateProjection,
-            onViewportSize = viewModel::setViewportSize,
             modifier = Modifier.padding(padding)
         )
     }
@@ -171,12 +156,10 @@ internal fun RadarContent(
     state: RadarUiState,
     onRetry: () -> Unit = {},
     onModeChange: (RadarMode) -> Unit = {},
-    onRangeChange: (RadarRange) -> Unit = {},
     onHorizonChange: (Int) -> Unit = {},
     onFrameChange: (Int) -> Unit = {},
     onPlayPause: () -> Unit = {},
     onRecalculate: () -> Unit = {},
-    onViewportSize: (width: Int, height: Int) -> Unit = { _, _ -> },
     modifier: Modifier = Modifier
 ) {
     when (state) {
@@ -192,8 +175,7 @@ internal fun RadarContent(
             }
         }
         is RadarUiState.Ready -> RadarReadyContent(
-            state, onModeChange, onRangeChange, onHorizonChange, onFrameChange, onPlayPause, onRecalculate,
-            onViewportSize, modifier
+            state, onModeChange, onHorizonChange, onFrameChange, onPlayPause, onRecalculate, modifier
         )
     }
 }
@@ -202,12 +184,10 @@ internal fun RadarContent(
 private fun RadarReadyContent(
     state: RadarUiState.Ready,
     onModeChange: (RadarMode) -> Unit,
-    onRangeChange: (RadarRange) -> Unit,
     onHorizonChange: (Int) -> Unit,
     onFrameChange: (Int) -> Unit,
     onPlayPause: () -> Unit,
     onRecalculate: () -> Unit,
-    onViewportSize: (width: Int, height: Int) -> Unit,
     modifier: Modifier
 ) {
     val contentModifier = modifier
@@ -235,33 +215,16 @@ private fun RadarReadyContent(
                     modifier = Modifier.testTag(TAG_RADAR_PROJECTION)
                 )
             }
-            Text(stringResource(R.string.radar_range), style = MaterialTheme.typography.labelLarge)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                RadarRange.entries.forEach { range ->
-                    FilterChip(
-                        selected = state.range == range,
-                        onClick = { onRangeChange(range) },
-                        label = { Text(stringResource(range.labelResource())) },
-                        modifier = Modifier.testTag(radarRangeTag(range))
-                    )
-                }
-            }
         }
 
         Card(
             modifier = Modifier.fillMaxWidth().then(if (state.isFullscreen) Modifier.weight(1f) else Modifier.height(360.dp)),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFE2E8F0)),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
             shape = if (state.isFullscreen) RoundedCornerShape(0.dp) else MaterialTheme.shapes.large
         ) {
             Box(Modifier.fillMaxSize()) {
-                RadarStage(
-                    state = state,
-                    onViewportSize = onViewportSize,
-                    modifier = Modifier.fillMaxSize().testTag(TAG_RADAR_STAGE)
-                )
-                if (state.isImageLoading || state.isBaseLoading) {
-                    CircularProgressIndicator(Modifier.align(Alignment.TopEnd).padding(12.dp).size(24.dp), strokeWidth = 2.dp)
-                }
+                // Carte zoomable (pincement) : remplace les niveaux Proche / Régional / Large.
+                RadarMap(state = state, modifier = Modifier.fillMaxSize().testTag(TAG_RADAR_STAGE))
                 Surface(
                     modifier = Modifier.align(Alignment.TopStart).padding(10.dp),
                     color = MaterialTheme.colorScheme.surface.copy(alpha = .88f),
@@ -294,7 +257,7 @@ private fun RadarReadyContent(
                         shape = MaterialTheme.shapes.large
                     ) {
                         Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            CompactModeControls(state, onModeChange, onRangeChange, onHorizonChange, onRecalculate)
+                            CompactModeControls(state, onModeChange, onHorizonChange, onRecalculate)
                             if (state.mode == RadarMode.OBSERVATION) ObservationControls(state, onFrameChange, onPlayPause)
                         }
                     }
@@ -359,7 +322,7 @@ private fun RadarAttribution(modifier: Modifier = Modifier) {
                 style = MaterialTheme.typography.labelSmall,
                 textDecoration = TextDecoration.Underline,
                 modifier = Modifier.clickable {
-                    uriHandler.openUri("https://www.openstreetmap.org/copyright")
+                    uriHandler.openUri("https://openfreemap.org")
                 }
             )
             Text(
@@ -435,7 +398,6 @@ private fun RadarLegendKey(label: String, dashed: Boolean, strong: Boolean) {
 private fun CompactModeControls(
     state: RadarUiState.Ready,
     onModeChange: (RadarMode) -> Unit,
-    onRangeChange: (RadarRange) -> Unit,
     onHorizonChange: (Int) -> Unit,
     onRecalculate: () -> Unit
 ) {
@@ -443,16 +405,6 @@ private fun CompactModeControls(
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
             FilterChip(state.mode == RadarMode.OBSERVATION, { onModeChange(RadarMode.OBSERVATION) }, { Text(stringResource(R.string.radar_observation)) })
             FilterChip(state.mode == RadarMode.PROJECTION, { onModeChange(RadarMode.PROJECTION) }, { Text(stringResource(R.string.radar_projection)) })
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            RadarRange.entries.forEach { range ->
-                FilterChip(
-                    selected = state.range == range,
-                    onClick = { onRangeChange(range) },
-                    label = { Text(stringResource(range.labelResource())) },
-                    modifier = Modifier.testTag(radarRangeTag(range))
-                )
-            }
         }
         if (state.mode == RadarMode.PROJECTION) {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -557,94 +509,19 @@ private fun RadarProjectionSummary(state: RadarUiState.Ready) {
     }
 }
 
-@Composable
-private fun RadarStage(
-    state: RadarUiState.Ready,
-    onViewportSize: (width: Int, height: Int) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val density = LocalDensity.current.density
-    val tileImages = remember(state.baseTiles) { state.baseTiles.map { it to it.image.toImageBitmap() } }
-    val radar = remember(state.displayImage) { state.displayImage?.toImageBitmap() }
-    val background = MaterialTheme.colorScheme.surfaceVariant
-    val markerColor = MaterialTheme.colorScheme.primary
-    // OpenStreetMap n'a pas de style sombre : en thème sombre, les tuiles
-    // sont inversées (teinte conservée) pour suivre l'apparence de l'app.
-    val baseMapFilter = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) DarkBaseMapFilter else null
-    Canvas(
-        modifier = modifier
-            .background(background)
-            .onSizeChanged { size ->
-                onViewportSize(
-                    (size.width / density).roundToInt(),
-                    (size.height / density).roundToInt()
-                )
-            }
-    ) {
-        val cx = size.width / 2
-        val cy = size.height / 2
-        val tilePx = 256f * density
-        tileImages.forEach { (tile, image) ->
-            drawImage(
-                image = image,
-                dstOffset = androidx.compose.ui.unit.IntOffset(
-                    (cx + tile.leftFromCenter * density).roundToInt(),
-                    (cy + tile.topFromCenter * density).roundToInt()
-                ),
-                dstSize = androidx.compose.ui.unit.IntSize(tilePx.roundToInt(), tilePx.roundToInt()),
-                colorFilter = baseMapFilter
-            )
-        }
-        radar?.let { image ->
-            val imageSize = 512f * state.range.radarScale * density
-            drawImage(
-                image = image,
-                dstOffset = androidx.compose.ui.unit.IntOffset((cx - imageSize / 2).roundToInt(), (cy - imageSize / 2).roundToInt()),
-                dstSize = androidx.compose.ui.unit.IntSize(imageSize.roundToInt(), imageSize.roundToInt()),
-                alpha = if (state.mode == RadarMode.PROJECTION) RADAR_PROJECTION_OBSERVATION_ALPHA else RADAR_OBSERVATION_ALPHA,
-                filterQuality = FilterQuality.None
-            )
-        }
-        if (state.projectionVisible) drawProjectionOverlay(state, density)
-        drawCircle(Color.White.copy(alpha = .95f), radius = 7f * density, center = Offset(cx, cy))
-        drawCircle(markerColor, radius = 4f * density, center = Offset(cx, cy))
-    }
-}
-
 /**
- * Inversion « intelligente » des tuiles OSM : négatif puis rotation de teinte
- * de 180° (l'eau reste bleue, la végétation verte), atténuée à 82 % et
- * légèrement relevée pour que le fond ne soit pas noir pur. Les sommes de
- * lignes de la rotation valent 1, d'où le décalage 255 × k + lift.
+ * Cellules projetées ; [geometryFor] place à l'écran l'image d'analyse de
+ * chaque zoom (calculée depuis la projection de la carte).
  */
-private val DarkBaseMapFilter: ColorFilter = run {
-    val k = 0.82f
-    val lift = 16f
-    val hue = floatArrayOf(
-        -0.574f, 1.430f, 0.144f,
-        0.426f, 0.430f, 0.144f,
-        0.426f, 1.430f, -0.856f
-    )
-    ColorFilter.colorMatrix(
-        ColorMatrix(
-            floatArrayOf(
-                -k * hue[0], -k * hue[1], -k * hue[2], 0f, 255f * k + lift,
-                -k * hue[3], -k * hue[4], -k * hue[5], 0f, 255f * k + lift,
-                -k * hue[6], -k * hue[7], -k * hue[8], 0f, 255f * k + lift,
-                0f, 0f, 0f, 1f, 0f
-            )
-        )
-    )
-}
-
-private fun RadarImage.toImageBitmap(): ImageBitmap =
-    Bitmap.createBitmap(argb, width, height, Bitmap.Config.ARGB_8888).asImageBitmap()
-
-private fun DrawScope.drawProjectionOverlay(state: RadarUiState.Ready, density: Float) {
+internal fun DrawScope.drawProjectionOverlay(
+    state: RadarUiState.Ready,
+    density: Float,
+    geometryFor: (analysisZoom: Int) -> com.meteocompare.app.domain.radar.RadarDisplayGeometry?
+) {
     val cells = state.nowcast?.cells.orEmpty().sortedBy { it.impact?.relevanceScore ?: .0 }
     cells.forEachIndexed { index, cell ->
         val projection = projectRainCell(cell, state.horizonMinutes.toDouble()) ?: return@forEachIndexed
-        val geometry = radarNowcastDisplayGeometry(state.range, (size.width / density).toDouble(), (size.height / density).toDouble(), cell.analysisZoom)
+        val geometry = geometryFor(cell.analysisZoom) ?: return@forEachIndexed
         val color = CELL_COLORS[(cell.colorIndex ?: index) % CELL_COLORS.size]
         val relevance = (cell.impact?.relevanceScore ?: .35).coerceIn(0.0, 1.0)
         val priority = index >= (cells.size - 4).coerceAtLeast(0) || relevance >= .62
@@ -835,10 +712,4 @@ private fun formatRadarTime(state: RadarUiState.Ready): String {
     val clockPreference = LocalClockFormatPreference.current
     val formatter = remember(locale, clockPreference) { WeatherTimeFormat.clock(locale, clockPreference) }
     return Instant.ofEpochSecond(state.selectedFrame.timeEpochSeconds).atZone(zone).format(formatter)
-}
-
-private fun RadarRange.labelResource(): Int = when (this) {
-    RadarRange.NEAR -> R.string.radar_range_near
-    RadarRange.REGIONAL -> R.string.radar_range_regional
-    RadarRange.WIDE -> R.string.radar_range_wide
 }

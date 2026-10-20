@@ -7,12 +7,14 @@ const val RADAR_ANALYSIS_ZOOM = 7
 const val RADAR_MIN_CELL_PIXELS = 180
 val RADAR_PROJECTION_HORIZONS = listOf(15, 30, 45, 60)
 
-/** Same visual ranges as the web radar. */
-enum class RadarRange(val mapZoom: Int, val radarZoom: Int, val radarScale: Int) {
-    NEAR(mapZoom = 9, radarZoom = 7, radarScale = 4),
-    REGIONAL(mapZoom = 8, radarZoom = 7, radarScale = 2),
-    WIDE(mapZoom = 6, radarZoom = 5, radarScale = 2)
-}
+/**
+ * Zoom maximal servi par l'API publique RainViewer (tuiles et images
+ * centrées). Au-delà, la carte agrandit simplement les pixels du radar.
+ */
+const val RAINVIEWER_MAX_ZOOM = 7
+
+/** Analyse complémentaire plus large, pour les cellules en approche lointaine. */
+const val RADAR_WIDE_ANALYSIS_ZOOM = 5
 
 enum class RadarMode { OBSERVATION, PROJECTION }
 
@@ -34,13 +36,6 @@ data class RadarImage(
         require(argb.size == width * height)
     }
 }
-
-data class RadarBaseTile(
-    /** Offset from the locality centre in Web-Mercator pixels (= CSS px on the web map). */
-    val leftFromCenter: Double,
-    val topFromCenter: Double,
-    val image: RadarImage
-)
 
 data class RadarPoint(val x: Double, val y: Double)
 
@@ -188,13 +183,17 @@ data class RadarNowcast(
     val analysisZoom: Int = RADAR_ANALYSIS_ZOOM
 )
 
+/**
+ * Position à l'écran (en dp) d'une image d'analyse : pixel (x, y) de l'image
+ * → (sourceLeft + x × sourceScale, sourceTop + y × sourceScale). Sans rotation
+ * de la carte, la projection Web Mercator est affine : deux coins suffisent.
+ */
 data class RadarDisplayGeometry(
     val sourceLeft: Double,
     val sourceTop: Double,
     val sourceScale: Double,
     val sourceSize: Double,
-    val analysisZoom: Int,
-    val mapZoom: Int
+    val analysisZoom: Int
 )
 
 data class RadarScene(

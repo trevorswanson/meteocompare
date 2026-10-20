@@ -37,25 +37,23 @@ obtenir un accord/plan adapté ou désactiver/remplacer le fournisseur radar ava
 publication. Le caractère gratuit, open-source et sans fonctionnalités premium de
 MeteoCompare ne dispense pas de cette vérification.
 
-## OpenStreetMap — fond cartographique du radar
+## OpenFreeMap — fond cartographique du radar
 
-MeteoCompare utilise les tuiles raster officielles :
-`https://tile.openstreetmap.org/{z}/{x}/{y}.png`.
+La carte radar utilise MapLibre Native avec les styles vectoriels OpenFreeMap
+(schéma OpenMapTiles, données OpenStreetMap), gratuits et sans clé :
+
+- `https://tiles.openfreemap.org/styles/positron` (thème clair) ;
+- `https://tiles.openfreemap.org/styles/dark` (thème sombre).
 
 Conformité implémentée :
 
-- attribution visible **« © OpenStreetMap contributors »**, avec lien vers
-  `https://www.openstreetmap.org/copyright` ;
-- `User-Agent` stable et identifiable avec l'URL du projet ;
-- cache HTTP disque OkHttp dédié (`cacheDir/radar-http`, 64 MiB) respectant les
-  en-têtes `Cache-Control`, `Expires`, `ETag` et `Last-Modified` ;
-- revalidation conditionnelle gérée par OkHttp après expiration ;
-- chargement limité aux tuiles réellement visibles ; aucune prélecture ou fonction
-  de téléchargement hors-ligne.
+- attribution visible **« OpenFreeMap © OpenMapTiles © OpenStreetMap »** avec
+  lien, en plus du bouton d'attribution MapLibre qui reprend celle du style ;
+- tuiles mises en cache par MapLibre selon les en-têtes HTTP du serveur ;
+- aucune prélecture hors de la zone affichée ni téléchargement hors-ligne.
 
-Politique à vérifier avant chaque release :
-`https://operations.osmfoundation.org/policies/tiles/`.
+Conditions à vérifier avant chaque release : `https://openfreemap.org`.
 
-**Gate release :** si le trafic devient significatif ou si les besoins ne peuvent
-plus respecter la politique du serveur communautaire OSM, migrer vers un fournisseur
-de tuiles OSM adapté ou une infrastructure propre avant publication.
+Les images RainViewer sont superposées comme couches raster, demandées au plus
+au zoom 7 (limite de l'API publique) puis agrandies par la carte.
+

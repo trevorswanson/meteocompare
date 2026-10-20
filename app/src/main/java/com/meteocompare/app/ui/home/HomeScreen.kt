@@ -414,12 +414,10 @@ private fun HomeRadarTab(modifier: Modifier, viewModel: RadarViewModel = hiltVie
         state = state,
         onRetry = viewModel::retry,
         onModeChange = viewModel::setMode,
-        onRangeChange = viewModel::setRange,
         onHorizonChange = viewModel::setHorizon,
         onFrameChange = viewModel::selectFrame,
         onPlayPause = viewModel::togglePlayback,
         onRecalculate = viewModel::recalculateProjection,
-        onViewportSize = viewModel::setViewportSize,
         modifier = modifier
     )
 }

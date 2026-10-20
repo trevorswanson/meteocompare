@@ -1,6 +1,8 @@
 package com.meteocompare.app.domain.radar
 
+import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.atan
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.exp
@@ -10,7 +12,9 @@ import kotlin.math.ln
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
+import kotlin.math.sinh
 import kotlin.math.sqrt
+import kotlin.math.tan
 
 private fun clamp(value: Double, min: Double, max: Double): Double = kotlin.math.max(min, kotlin.math.min(max, value))
 private fun clampLat(value: Double): Double = clamp(value, -85.05112878, 85.05112878)
@@ -699,18 +703,28 @@ fun filterPeripheralRainCells(
     }
 }
 
-fun radarNowcastDisplayGeometry(
-    range: RadarRange,
-    width: Double,
-    height: Double,
-    analysisZoom: Int = RADAR_ANALYSIS_ZOOM
-): RadarDisplayGeometry {
-    val sourceScale = 2.0.pow(range.mapZoom - analysisZoom)
-    val sourceSize = RADAR_ANALYSIS_SIZE * sourceScale
-    return RadarDisplayGeometry((width - sourceSize) / 2, (height - sourceSize) / 2, sourceScale, sourceSize, analysisZoom, range.mapZoom)
+/**
+ * Latitude et longitude du pixel (x, y) d'une image d'analyse RainViewer de
+ * [RADAR_ANALYSIS_SIZE] px centrée sur ([centerLatitude], [centerLongitude])
+ * au zoom [zoom] (monde Web Mercator de 256 × 2^zoom px, comme l'API).
+ */
+fun radarAnalysisPixelLatLon(
+    centerLatitude: Double,
+    centerLongitude: Double,
+    zoom: Int,
+    x: Double,
+    y: Double
+): Pair<Double, Double> {
+    val world = 256.0 * (1 shl zoom)
+    val lat = clampLat(centerLatitude) * PI / 180
+    val centerX = (centerLongitude + 180) / 360 * world
+    val centerY = (1 - ln(tan(lat) + 1 / cos(lat)) / PI) / 2 * world
+    val worldX = centerX + x - RADAR_ANALYSIS_SIZE / 2.0
+    val worldY = centerY + y - RADAR_ANALYSIS_SIZE / 2.0
+    val longitude = worldX / world * 360 - 180
+    val latitude = atan(sinh(PI * (1 - 2 * worldY / world))) * 180 / PI
+    return latitude to longitude
 }
-
-private fun Double.pow(power: Int): Double = Math.pow(this, power.toDouble())
 
 fun recentRadarFrameIndices(frameCount: Int, limit: Int = 7): List<Int> {
     val count = max(0, frameCount)

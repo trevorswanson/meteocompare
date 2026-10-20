@@ -276,30 +276,21 @@ class RainRadarNowcastTest {
     }
 
     @Test
-    fun `range geometry keeps RainViewer and base map at same displayed zoom`() {
-        RadarRange.entries.forEach { range ->
-            var scale = range.radarScale
-            var power = 0
-            while (scale > 1 && scale % 2 == 0) {
-                scale /= 2
-                power++
-            }
-            assertEquals(1, scale)
-            assertEquals(range.mapZoom, range.radarZoom + power)
-        }
-        assertTrue(RadarRange.NEAR.mapZoom > RadarRange.REGIONAL.mapZoom)
-        assertTrue(RadarRange.REGIONAL.mapZoom > RadarRange.WIDE.mapZoom)
+    fun `analysis image centre maps back to the locality and corners follow Web Mercator`() {
+        val (lat, lon) = radarAnalysisPixelLatLon(48.8566, 2.3522, RADAR_ANALYSIS_ZOOM, 256.0, 256.0)
+        assertEquals(48.8566, lat, 1e-9)
+        assertEquals(2.3522, lon, 1e-9)
+        // 512 px au zoom 7 (monde de 32 768 px) = 5,625° de longitude.
+        val (_, west) = radarAnalysisPixelLatLon(48.8566, 2.3522, RADAR_ANALYSIS_ZOOM, 0.0, 256.0)
+        val (_, east) = radarAnalysisPixelLatLon(48.8566, 2.3522, RADAR_ANALYSIS_ZOOM, 512.0, 256.0)
+        assertEquals(5.625, east - west, 1e-9)
+        // Le nord est en haut de l'image.
+        val (north, _) = radarAnalysisPixelLatLon(48.8566, 2.3522, RADAR_ANALYSIS_ZOOM, 256.0, 0.0)
+        assertTrue(north > 48.8566)
     }
 
     @Test
-    fun `canonical display geometry matches web zoom rules`() {
-        val near = radarNowcastDisplayGeometry(RadarRange.NEAR, 1000.0, 620.0)
-        val regional = radarNowcastDisplayGeometry(RadarRange.REGIONAL, 1000.0, 620.0)
-        val wide = radarNowcastDisplayGeometry(RadarRange.WIDE, 1000.0, 620.0)
-        assertEquals(4.0, near.sourceScale, 0.0)
-        assertEquals(2.0, regional.sourceScale, 0.0)
-        assertEquals(.5, wide.sourceScale, 0.0)
-        assertEquals(RADAR_ANALYSIS_ZOOM, wide.analysisZoom)
+    fun `recent frame selection keeps the latest seven`() {
         assertEquals(listOf(6, 7, 8, 9, 10, 11, 12), recentRadarFrameIndices(13, 7))
         assertEquals(listOf(0, 1, 2, 3, 4), recentRadarFrameIndices(5, 7))
     }

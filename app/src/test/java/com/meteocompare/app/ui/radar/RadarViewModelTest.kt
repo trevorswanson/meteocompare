@@ -5,12 +5,11 @@ import com.meteocompare.app.data.radar.RadarRepository
 import com.meteocompare.app.domain.model.City
 import com.meteocompare.app.domain.repository.CityRepository
 import com.meteocompare.app.domain.radar.RADAR_ANALYSIS_ZOOM
-import com.meteocompare.app.domain.radar.RadarBaseTile
 import com.meteocompare.app.domain.radar.RadarFrame
 import com.meteocompare.app.domain.radar.RadarImage
 import com.meteocompare.app.domain.radar.RadarMetadata
 import com.meteocompare.app.domain.radar.RadarMode
-import com.meteocompare.app.domain.radar.RadarRange
+import com.meteocompare.app.domain.radar.RADAR_WIDE_ANALYSIS_ZOOM
 import com.meteocompare.app.ui.navigation.Destinations
 import io.mockk.every
 import io.mockk.mockk
@@ -69,15 +68,17 @@ class RadarViewModelTest {
     }
 
     @Test
-    fun `automatic playback does not request the first frame twice`() = runTest(dispatcher) {
+    fun `playback downloads nothing for display, only analysis images`() = runTest(dispatcher) {
         val repo = FakeRadarRepository()
         val vm = viewModel(repo)
-        runCurrent()
+        advanceUntilIdle()
 
-        assertTrue((vm.state.value as RadarUiState.Ready).isPlaying)
-        // One display request + one nowcast-analysis request. Previously
-        // load() started and cancelled an extra display request here.
-        assertEquals(2, repo.radarFramePaths.count { it == "/v2/radar/frame0" })
+        assertFalse((vm.state.value as RadarUiState.Ready).isPlaying)
+        // La carte charge elle-même les tuiles radar : seules les images
+        // d'analyse (zoom 7, puis zoom 5 pour les cellules lointaines) passent
+        // par le repository, une fois chacune.
+        assertTrue(repo.radarZooms.all { it == RADAR_ANALYSIS_ZOOM || it == RADAR_WIDE_ANALYSIS_ZOOM })
+        assertEquals(1, repo.radarFramePaths.zip(repo.radarZooms).count { it == "/v2/radar/frame0" to RADAR_ANALYSIS_ZOOM })
     }
 
     @Test
@@ -91,30 +92,12 @@ class RadarViewModelTest {
     }
 
     @Test
-    fun `range change uses matching map and radar zooms`() = runTest(dispatcher) {
-        val repo = FakeRadarRepository()
-        val vm = viewModel(repo)
-        runCurrent()
-        vm.setViewportSize(360, 360)
-        runCurrent()
-        vm.setRange(RadarRange.WIDE)
-        runCurrent()
-
-        val state = vm.state.value as RadarUiState.Ready
-        assertEquals(RadarRange.WIDE, state.range)
-        assertTrue(6 in repo.baseZooms)
-        assertTrue(5 in repo.radarZooms)
-    }
-
-
-    @Test
     fun `nowcast frame downloads stay sequential like the web implementation`() = runTest(dispatcher) {
         val repo = SequentialAnalysisRepository()
         val handle = SavedStateHandle(
             mapOf(
                 Destinations.CITY_DETAIL_ARG to city.id,
-                "radar.mode" to RadarMode.PROJECTION.name,
-                "radar.range" to RadarRange.WIDE.name
+                "radar.mode" to RadarMode.PROJECTION.name
             )
         )
         viewModel(repo, handle)
@@ -125,34 +108,12 @@ class RadarViewModelTest {
     }
 
     @Test
-    fun `base tiles wait for the real viewport and identical viewport is not reloaded`() = runTest(dispatcher) {
-        val repo = FakeRadarRepository()
-        val vm = viewModel(repo)
-        runCurrent()
-
-        assertTrue(repo.baseZooms.isEmpty())
-        vm.setViewportSize(360, 360)
-        runCurrent()
-        assertEquals(listOf(9), repo.baseZooms)
-        assertEquals(listOf(360 to 360), repo.baseViewports)
-
-        vm.setViewportSize(360, 360)
-        runCurrent()
-        assertEquals(1, repo.baseZooms.size)
-
-        vm.setViewportSize(1200, 800)
-        runCurrent()
-        assertEquals(listOf(360 to 360, 1200 to 800), repo.baseViewports)
-    }
-
-    @Test
     fun `changing projection horizon is local and triggers no repository call`() = runTest(dispatcher) {
         val repo = FakeRadarRepository()
         val vm = viewModel(repo)
         runCurrent()
         val metadataCalls = repo.metadataForceFlags.size
         val radarCalls = repo.radarZooms.size
-        val baseCalls = repo.baseZooms.size
 
         vm.setHorizon(15)
         vm.setHorizon(60)
@@ -160,7 +121,6 @@ class RadarViewModelTest {
 
         assertEquals(metadataCalls, repo.metadataForceFlags.size)
         assertEquals(radarCalls, repo.radarZooms.size)
-        assertEquals(baseCalls, repo.baseZooms.size)
         assertEquals(60, (vm.state.value as RadarUiState.Ready).horizonMinutes)
     }
 
@@ -170,7 +130,6 @@ class RadarViewModelTest {
             mapOf(
                 Destinations.CITY_DETAIL_ARG to city.id,
                 "radar.mode" to RadarMode.PROJECTION.name,
-                "radar.range" to RadarRange.WIDE.name,
                 "radar.horizon" to 60,
                 "radar.fullscreen" to true
             )
@@ -180,16 +139,13 @@ class RadarViewModelTest {
 
         val restored = vm.state.value as RadarUiState.Ready
         assertEquals(RadarMode.PROJECTION, restored.mode)
-        assertEquals(RadarRange.WIDE, restored.range)
         assertEquals(60, restored.horizonMinutes)
         assertTrue(restored.isFullscreen)
         assertFalse(restored.isPlaying)
         assertEquals(restored.frames.lastIndex, restored.selectedFrameIndex)
 
-        vm.setRange(RadarRange.REGIONAL)
         vm.setHorizon(45)
         vm.toggleFullscreen()
-        assertEquals(RadarRange.REGIONAL.name, handle.get<String>("radar.range"))
         assertEquals(45, handle.get<Int>("radar.horizon"))
         assertEquals(false, handle.get<Boolean>("radar.fullscreen"))
     }
@@ -268,13 +224,6 @@ class RadarViewModelTest {
             }
             return image
         }
-
-        override suspend fun baseTiles(
-            city: City,
-            zoom: Int,
-            viewportWidth: Int,
-            viewportHeight: Int
-        ): List<RadarBaseTile> = emptyList()
     }
 
     private class FakeRadarRepository(
@@ -283,8 +232,6 @@ class RadarViewModelTest {
         val metadataForceFlags = mutableListOf<Boolean>()
         val radarZooms = mutableListOf<Int>()
         val radarFramePaths = mutableListOf<String>()
-        val baseZooms = mutableListOf<Int>()
-        val baseViewports = mutableListOf<Pair<Int, Int>>()
         private val image = RadarImage(8, 8, IntArray(64))
         private val frames = List(7) { i -> RadarFrame(1_700_000_000L + i * 600, "/v2/radar/frame$i") }
 
@@ -298,12 +245,6 @@ class RadarViewModelTest {
             radarZooms += zoom
             radarFramePaths += frame.path
             return image
-        }
-
-        override suspend fun baseTiles(city: City, zoom: Int, viewportWidth: Int, viewportHeight: Int): List<RadarBaseTile> {
-            baseZooms += zoom
-            baseViewports += viewportWidth to viewportHeight
-            return emptyList()
         }
     }
 }

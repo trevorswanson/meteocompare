@@ -5,26 +5,18 @@ import com.meteocompare.app.BuildConfig
 import com.meteocompare.app.di.IoDispatcher
 import com.meteocompare.app.di.RadarOkHttp
 import com.meteocompare.app.domain.model.City
-import com.meteocompare.app.domain.radar.RadarBaseTile
 import com.meteocompare.app.domain.radar.RadarFrame
 import com.meteocompare.app.domain.radar.RadarImage
 import com.meteocompare.app.domain.radar.RadarMetadata
-import android.util.Log
+import com.meteocompare.app.domain.radar.RAINVIEWER_MAX_ZOOM
 import dagger.Lazy
 import java.io.IOException
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.math.asinh
-import kotlin.math.floor
 import kotlin.math.max
-import kotlin.math.tan
 import kotlinx.coroutines.CoroutineDispatcher
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -38,23 +30,15 @@ import okhttp3.Request
 import okhttp3.Response
 
 private const val RADAR_METADATA_URL = "https://api.rainviewer.com/public/weather-maps.json"
-private const val OSM_TILE_URL = "https://tile.openstreetmap.org"
 private const val RADAR_COLOR_SCHEME = 2
 private const val RADAR_OPTIONS = "0_1"
 private const val METADATA_TTL_MS = 5 * 60_000L
 internal const val FRAME_CACHE_SIZE = 16
-internal const val TILE_CACHE_SIZE = 32
 private const val DOWNLOAD_LOCK_STRIPES = 32
 
 interface RadarRepository {
     suspend fun metadata(forceRefresh: Boolean = false): RadarMetadata
     suspend fun radarImage(metadata: RadarMetadata, frame: RadarFrame, city: City, zoom: Int): RadarImage
-    suspend fun baseTiles(
-        city: City,
-        zoom: Int,
-        viewportWidth: Int = 512,
-        viewportHeight: Int = 360
-    ): List<RadarBaseTile>
 }
 
 @Serializable
@@ -87,56 +71,12 @@ internal fun isAllowedRainViewerHost(host: String): Boolean =
 internal fun radarImageUrl(metadata: RadarMetadata, frame: RadarFrame, city: City, zoom: Int): String =
     "${metadata.host}${frame.path}/512/$zoom/${"%.5f".format(java.util.Locale.US, city.latitude)}/${"%.5f".format(java.util.Locale.US, city.longitude)}/$RADAR_COLOR_SCHEME/$RADAR_OPTIONS.png"
 
-internal data class MercatorPoint(val x: Double, val y: Double)
-
-internal fun projectWebMercator(latitude: Double, longitude: Double, zoom: Int): MercatorPoint {
-    val n = (1 shl zoom) * 256.0
-    val lat = latitude.coerceIn(-85.05112878, 85.05112878)
-    val rad = Math.toRadians(lat)
-    return MercatorPoint(
-        x = (longitude + 180) / 360 * n,
-        y = (1 - asinh(tan(rad)) / Math.PI) / 2 * n
-    )
-}
-
-internal data class BaseTileRequest(
-    val x: Int,
-    val y: Int,
-    val leftFromCenter: Double,
-    val topFromCenter: Double,
-    val url: String
-)
-
-internal fun baseTileRequests(
-    city: City,
-    zoom: Int,
-    viewportWidth: Int = 512,
-    viewportHeight: Int = 360
-): List<BaseTileRequest> {
-    val width = max(280, viewportWidth).toDouble()
-    val height = max(180, viewportHeight).toDouble()
-    val center = projectWebMercator(city.latitude, city.longitude, zoom)
-    val left = center.x - width / 2
-    val top = center.y - height / 2
-    val startX = floor(left / 256).toInt()
-    val endX = floor((left + width) / 256).toInt()
-    val tileCount = 1 shl zoom
-    val startY = max(0, floor(top / 256).toInt())
-    val endY = minOf(tileCount - 1, floor((top + height) / 256).toInt())
-    val rows = mutableListOf<BaseTileRequest>()
-    for (y in startY..endY) for (rawX in startX..endX) {
-        val x = ((rawX % tileCount) + tileCount) % tileCount
-        rows += BaseTileRequest(
-            x = x,
-            y = y,
-            leftFromCenter = rawX * 256.0 - center.x,
-            topFromCenter = y * 256.0 - center.y,
-            url = "$OSM_TILE_URL/$zoom/$x/$y.png"
-        )
-    }
-    return rows
-}
-
+/**
+ * Gabarit de tuiles 256 px d'une image radar pour la carte ({z}/{x}/{y}).
+ * La carte demande au plus [RAINVIEWER_MAX_ZOOM] puis agrandit.
+ */
+internal fun radarTileUrlTemplate(metadata: RadarMetadata, frame: RadarFrame): String =
+    "${metadata.host}${frame.path}/256/{z}/{x}/{y}/$RADAR_COLOR_SCHEME/$RADAR_OPTIONS.png"
 
 internal suspend fun Call.awaitBodyBytes(urlForError: String = request().url.toString()): ByteArray =
     suspendCancellableCoroutine { continuation ->
@@ -179,9 +119,6 @@ class RainViewerRadarRepository @Inject constructor(
     private val frameCache = object : LinkedHashMap<String, RadarImage>(FRAME_CACHE_SIZE, .75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RadarImage>?): Boolean = size > FRAME_CACHE_SIZE
     }
-    private val tileCache = object : LinkedHashMap<String, RadarImage>(TILE_CACHE_SIZE, .75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, RadarImage>?): Boolean = size > TILE_CACHE_SIZE
-    }
     private val cacheMutex = Mutex()
     private val downloadLocks = Array(DOWNLOAD_LOCK_STRIPES) { Mutex() }
 
@@ -216,36 +153,6 @@ class RainViewerRadarRepository @Inject constructor(
                 cacheMutex.withLock { frameCache[url] = image }
             }
         }
-    }
-
-    override suspend fun baseTiles(
-        city: City,
-        zoom: Int,
-        viewportWidth: Int,
-        viewportHeight: Int
-    ): List<RadarBaseTile> = coroutineScope {
-        baseTileRequests(city, zoom, viewportWidth, viewportHeight).map { tile ->
-            async {
-                try {
-                    cacheMutex.withLock { tileCache[tile.url] }?.let { cached ->
-                        if (BuildConfig.DEBUG) {
-                            Log.d("MeteoCompare/OSMCache", "MEMORY_HIT tile=${tile.url.removePrefix("$OSM_TILE_URL/")}")
-                        }
-                        return@async RadarBaseTile(tile.leftFromCenter, tile.topFromCenter, cached)
-                    }
-                    val image = downloadLock(tile.url).withLock {
-                        cacheMutex.withLock { tileCache[tile.url] } ?: decodeImage(getBytes(tile.url)).also { decoded ->
-                            cacheMutex.withLock { tileCache[tile.url] = decoded }
-                        }
-                    }
-                    RadarBaseTile(tile.leftFromCenter, tile.topFromCenter, image)
-                } catch (cancellation: CancellationException) {
-                    throw cancellation
-                } catch (_: Exception) {
-                    null
-                }
-            }
-        }.awaitAll().filterNotNull()
     }
 
     private suspend fun getBytes(url: String): ByteArray = withContext(ioDispatcher) {

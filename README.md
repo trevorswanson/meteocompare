@@ -44,7 +44,7 @@ Depuis la v1.0, l'app suit aussi **le biais historique de chaque modèle sur cha
 - **"Fraîcheur" des données** affichée sur chaque carte : "Mis à jour à l'instant", "il y a 5 min", etc. — auto-rafraîchi au fil du temps
 - **Cartes Home compactes** : accent météo vertical sur le bord gauche, métriques resserrées, pastille « N scénarios » repliable et information de mise à jour réunies sur une seule ligne
 - **Vigilance officielle Météo-France** : pour les villes françaises uniquement, contrôle immédiat à l’ajout, affichage jaune/orange/rouge depuis `meteocompare.app/_mcx/vigilance`, détail des phénomènes et créneaux, et vagues-submersion dans la section marine. Les villes hors France ne déclenchent aucun appel Vigilance et la suppression d’un favori purge son état/cache Vigilance. Aucun secret Météo-France n’est embarqué dans l’APK.
-- **Radar pluie natif** : animation des observations RainViewer sur fond OpenStreetMap, trois portées (Proche/Régional/Large) et nowcast local par cellule à **+15 / +30 / +45 / +60 min** avec advection, évolution de forme, incertitude, trajectoires observée/projetée et estimation d’impact sur la localité. L’implémentation est 100 % Kotlin/Compose, sans WebView.
+- **Radar pluie natif** : animation des observations RainViewer sur une carte MapLibre zoomable (fond OpenFreeMap clair ou sombre) et nowcast local par cellule à **+15 / +30 / +45 / +60 min** avec advection, évolution de forme, incertitude, trajectoires observée/projetée et estimation d’impact sur la localité. L’implémentation est 100 % Kotlin/Compose, sans WebView.
 - **Mode Mer / côte par localité** : la Home affiche une pastille bleue sur le menu `⋮` lorsqu’une localité est éligible au mode côtier, puis une icône 🌊 près du nom uniquement lorsque l’option est réellement activée. La page Détails affiche alors vagues, houle, température de mer et marées estimées. La décision d’éligibilité est mise en cache 6 h avec revalidation ; les données restent indicatives et ne sont pas destinées à la navigation.
 - **Heatmap 12 h intégrée aux cartes Home** : 12 cellules thermiques continues avec température par heure, trois repères horaires directement dans la bande et marqueur de pluie à partir de 30 %, sans ajouter une ligne supplémentaire sous la heatmap
 - **Chronologie visuelle sur la page détail** : timeline compacte des prochaines échéances avec heatmap de température, pluie, vent, accord inter-modèles et mise en évidence des changements significatifs
@@ -55,7 +55,7 @@ Depuis la v1.0, l'app suit aussi **le biais historique de chaque modèle sur cha
 - **Batching multi-modèles** : les N modèles activés sont récupérés en 1 seule requête HTTPS (au lieu de N requêtes parallèles) — gain sur la latence et la batterie
 - **Modes clair/sombre**, thème dynamique Material You (Android 12+)
 - **Français + Anglais + Espagnol + Allemand + Italien** (widgets inclus — le rendu suit la préférence app, pas la locale système)
-- **Aucune publicité, aucun tracker** ; les connexions sortantes sont limitées aux services nécessaires aux fonctions météo (Open-Meteo, Worker Vigilance MeteoCompare et, uniquement à l'ouverture du radar, RainViewer + OpenStreetMap)
+- **Aucune publicité, aucun tracker** ; les connexions sortantes sont limitées aux services nécessaires aux fonctions météo (Open-Meteo, Worker Vigilance MeteoCompare et, uniquement à l'ouverture du radar, RainViewer + OpenFreeMap)
 
 ## Stack technique
 
@@ -254,7 +254,7 @@ Le batching réduit surtout le nombre de connexions, handshakes TLS et réveils 
 2. Sync Gradle (le wrapper sera téléchargé automatiquement la première fois).
 3. Lancer sur émulateur API 27+ ou device.
 
-Aucune clé API ni credential Météo-France n’est nécessaire dans Android : Open-Meteo est appelé directement et la Vigilance passe par le Worker public MeteoCompare, qui conserve ses secrets côté serveur. Le radar utilise l’API publique RainViewer et les tuiles OpenStreetMap uniquement après ouverture explicite de cet écran.
+Aucune clé API ni credential Météo-France n’est nécessaire dans Android : Open-Meteo est appelé directement et la Vigilance passe par le Worker public MeteoCompare, qui conserve ses secrets côté serveur. Le radar utilise l’API publique RainViewer et les tuiles OpenFreeMap uniquement après ouverture explicite de cet écran.
 
 Par défaut, le build utilise `https://meteocompare.app/` comme base du Worker. Pour un environnement de test, elle peut être surchargée sans secret avec `-PVIGILANCE_BASE_URL=https://votre-worker.workers.dev/`. Seules les URL HTTPS sont acceptées.
 
@@ -294,7 +294,7 @@ Le module `ui/accessibility/A11yFormatter.kt` centralise les chaînes pour garde
 
 ## Politique de confidentialité
 
-Le fichier [PRIVACY.md](PRIVACY.md) décrit les données traitées localement et les transmissions fonctionnelles vers Open-Meteo, le Worker Vigilance, RainViewer et OpenStreetMap. MeteoCompare n'intègre ni publicité, ni analytics, ni crash reporting distant, ni compte utilisateur.
+Le fichier [PRIVACY.md](PRIVACY.md) décrit les données traitées localement et les transmissions fonctionnelles vers Open-Meteo, le Worker Vigilance, RainViewer et OpenFreeMap. MeteoCompare n'intègre ni publicité, ni analytics, ni crash reporting distant, ni compte utilisateur.
 
 Pour Google Play, la préparation du formulaire **Sécurité des données** est documentée dans [play-store/DATA_SAFETY.md](play-store/DATA_SAFETY.md). Les conditions et attributions des services radar/cartographiques sont suivies dans [THIRD_PARTY_SERVICES.md](THIRD_PARTY_SERVICES.md).
 
