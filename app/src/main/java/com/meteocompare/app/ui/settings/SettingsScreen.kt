@@ -36,12 +36,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.FavoriteBorder
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Refresh
+import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -50,6 +55,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -140,6 +146,7 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val showToast = rememberAppToastDispatcher()
     var modelCommitInProgress by remember { mutableStateOf(false) }
+    var page by rememberSaveable { mutableStateOf<SettingsPage?>(null) }
 
     // Les modèles sont édités localement puis persistés en un seul lot.
     // Cela évite que chaque checkbox réveille les écrans météo encore vivants
@@ -161,7 +168,9 @@ fun SettingsScreen(
             }
         }
     }
-    BackHandler(onBack = commitModelsAndBack)
+    // Retour : d'une page vers la liste, puis de la liste hors des réglages.
+    val navigateBack: () -> Unit = { if (page != null) page = null else commitModelsAndBack() }
+    BackHandler(onBack = navigateBack)
 
     // Notifications : l'état système est relu à chaque retour sur l'écran
     // (l'utilisateur a pu les autoriser depuis les réglages Android).
@@ -207,10 +216,10 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(stringResource(R.string.action_settings)) },
+                title = { Text(page?.let { settingsPageTitle(it) } ?: stringResource(R.string.action_settings)) },
                 navigationIcon = {
                     IconButton(
-                        onClick = commitModelsAndBack,
+                        onClick = navigateBack,
                         modifier = Modifier.testTag(TAG_SETTINGS_BACK)
                     ) {
                         Icon(
@@ -255,6 +264,8 @@ fun SettingsScreen(
             },
             onDonateClick = { showDonationDialog = true },
             padding = padding,
+            page = page,
+            onOpenPage = { page = it },
             notificationSection = {
                 NotificationSettingsSection(
                     settings = notificationSettings,
@@ -306,7 +317,10 @@ internal fun SettingsContent(
     unitSystem: UnitSystem = UnitSystem.METRIC,
     onUnitSystemSelected: (UnitSystem) -> Unit = {},
     clockFormat: ClockFormatPreference = ClockFormatPreference.AUTO,
-    onClockFormatSelected: (ClockFormatPreference) -> Unit = {}
+    onClockFormatSelected: (ClockFormatPreference) -> Unit = {},
+    /** Page affichée ; null = liste des catégories. */
+    page: SettingsPage? = null,
+    onOpenPage: (SettingsPage) -> Unit = {}
 ) {
     // État du tri des modèles — survit à la rotation et au dark-mode toggle.
     // Défaut ZONE parce que 90% des utilisateurs raisonnent d'abord "modèles
@@ -316,320 +330,365 @@ internal fun SettingsContent(
         mutableStateOf(ModelSortMode.ZONE)
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize().testTag(TAG_SETTINGS_ROOT),
-        contentPadding = PaddingValues(
-            top = padding.calculateTopPadding(),
-            bottom = padding.calculateBottomPadding() + 16.dp
-        )
-    ) {
-        item {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_appearance),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(8.dp))
-                ThemeSelector(selected = theme, onSelect = onThemeSelected)
-            }
-        }
-        item { HorizontalDivider() }
-
-        item {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_language),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(8.dp))
-                LanguageSelector(selected = language, onSelect = onLanguageSelected)
-            }
-        }
-        item { HorizontalDivider() }
-
-        item {
-            Column(modifier = Modifier.padding(16.dp).testTag("settings_clock_format")) {
-                Text(
-                    stringResource(R.string.settings_clock_format),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    stringResource(R.string.settings_clock_format_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                ClockFormatSelector(clockFormat, onClockFormatSelected)
-            }
-        }
-        item { HorizontalDivider() }
-
-        item {
-            Column(modifier = Modifier.padding(16.dp).testTag("settings_units")) {
-                Text(stringResource(R.string.settings_units), style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(8.dp))
-                UnitSystemSelector(unitSystem, onUnitSystemSelected)
-            }
-        }
-        item { HorizontalDivider() }
-
-        item {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_refresh_interval_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_refresh_interval_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                RefreshIntervalSelector(
-                    selected = refreshInterval,
-                    onSelect = onRefreshIntervalSelected
-                )
-            }
-        }
-        item { HorizontalDivider() }
-
-        item { notificationSection() }
-
-        item {
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_forecast_engine_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_forecast_engine_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                ForecastEngineSelector(
-                    selected = forecastEngine,
-                    onSelect = onForecastEngineSelected
-                )
-                Spacer(Modifier.height(10.dp))
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(14.dp),
-                        verticalAlignment = Alignment.Top
-                    ) {
-                        Surface(
-                            modifier = Modifier.size(30.dp),
-                            shape = CircleShape,
-                            color = MaterialTheme.colorScheme.primary
-                        ) {
-                            Row(
-                                modifier = Modifier.fillMaxSize(),
-                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = "Σ",
-                                    style = MaterialTheme.typography.titleSmall,
-                                    color = MaterialTheme.colorScheme.onPrimary,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                        Spacer(Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+    // Chaque page repart en haut de liste.
+    key(page) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize().testTag(TAG_SETTINGS_ROOT),
+            contentPadding = PaddingValues(
+                top = padding.calculateTopPadding(),
+                bottom = padding.calculateBottomPadding() + 16.dp
+            )
+        ) {
+            when (page) {
+                null -> settingsHub(onOpenPage)
+                SettingsPage.APPEARANCE -> {
+                    item {
+                        Column(modifier = Modifier.padding(16.dp)) {
                             Text(
-                                text = stringResource(
-                                    R.string.engine_comparison_selected,
-                                    forecastEngineLabel(forecastEngine)
-                                ),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                text = stringResource(R.string.settings_appearance),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            ThemeSelector(selected = theme, onSelect = onThemeSelected)
+                        }
+                    }
+                    item { HorizontalDivider() }
+
+                    item {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_language),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            LanguageSelector(selected = language, onSelect = onLanguageSelected)
+                        }
+                    }
+                    item { HorizontalDivider() }
+
+                    item {
+                        Column(modifier = Modifier.padding(16.dp).testTag("settings_clock_format")) {
+                            Text(
+                                stringResource(R.string.settings_clock_format),
+                                style = MaterialTheme.typography.titleMedium,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Spacer(Modifier.height(4.dp))
                             Text(
-                                text = forecastEngineDescription(forecastEngine),
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurface
+                                stringResource(R.string.settings_clock_format_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
+                            Spacer(Modifier.height(8.dp))
+                            ClockFormatSelector(clockFormat, onClockFormatSelected)
+                        }
+                    }
+                    item { HorizontalDivider() }
+
+                    item {
+                        Column(modifier = Modifier.padding(16.dp).testTag("settings_units")) {
+                            Text(stringResource(R.string.settings_units), style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.height(8.dp))
+                            UnitSystemSelector(unitSystem, onUnitSystemSelected)
+                        }
+                    }
+                }
+                SettingsPage.SYNC_NOTIFICATIONS -> {
+                    item {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_refresh_interval_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.settings_refresh_interval_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            RefreshIntervalSelector(
+                                selected = refreshInterval,
+                                onSelect = onRefreshIntervalSelected
+                            )
+                        }
+                    }
+                    item { HorizontalDivider() }
+
+                    item { notificationSection() }
+                }
+                SettingsPage.MODELS -> {
+                    item {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_forecast_engine_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.settings_forecast_engine_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            ForecastEngineSelector(
+                                selected = forecastEngine,
+                                onSelect = onForecastEngineSelected
+                            )
+                            Spacer(Modifier.height(10.dp))
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Surface(
+                                        modifier = Modifier.size(30.dp),
+                                        shape = CircleShape,
+                                        color = MaterialTheme.colorScheme.primary
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.fillMaxSize(),
+                                            horizontalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "Σ",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.onPrimary,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = stringResource(
+                                                R.string.engine_comparison_selected,
+                                                forecastEngineLabel(forecastEngine)
+                                            ),
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        Spacer(Modifier.height(4.dp))
+                                        Text(
+                                            text = forecastEngineDescription(forecastEngine),
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    item { HorizontalDivider() }
+
+                    // ─── Section "Modèles météo" ────────────────────────────────────
+                    // Header + description + sélecteur de tri. Le sélecteur est intégré
+                    // ici pour rester proche du contexte "cette liste concerne les
+                    // modèles" — le déplacer plus haut/bas romprait le fil narratif.
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_models_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.settings_models_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = stringResource(R.string.model_metadata_explanation),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            ModelSortSelector(selected = sortMode, onSelect = { sortMode = it })
+                        }
+                    }
+
+                    // Rendu de la liste avec headers de section selon le tri. Une seule
+                    // méthode qui écrit dans le LazyListScope — évite de dupliquer la
+                    // logique de LazyColumn.items par mode.
+                    renderModelList(
+                        enabledModels = enabledModels,
+                        sortMode = sortMode,
+                        onToggle = onToggle
+                    )
+
+                    item {
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = stringResource(R.string.settings_models_min_warning),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+
+                    // Action de maintenance volontairement placée tout en bas : elle ne
+                    // fait pas partie des réglages courants et doit rester exceptionnelle.
+                    item {
+                        HorizontalDivider()
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_bias_refresh_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.settings_bias_refresh_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            OutlinedButton(
+                                onClick = onBiasRefreshClick,
+                                enabled = !biasRefreshRequested,
+                                modifier = Modifier.fillMaxWidth().testTag(TAG_SETTINGS_BIAS_REFRESH)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Refresh,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.settings_bias_refresh_action))
+                            }
+                            if (biasRefreshRequested) {
+                                Spacer(Modifier.height(8.dp))
+                                Text(
+                                    text = stringResource(R.string.settings_bias_refresh_queued),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        }
+                    }
+                }
+                SettingsPage.ABOUT -> {
+                    // Section "À propos"
+                    item {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Text(
+                                text = stringResource(R.string.settings_about_title),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(
+                                    R.string.settings_about_version,
+                                    com.meteocompare.app.BuildConfig.VERSION_NAME
+                                ),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_about_data_source),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            OpenMeteoAttribution(
+                                home = false,
+                                text = stringResource(R.string.open_meteo_link_label),
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_about_marine),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = stringResource(R.string.settings_about_models_credit),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = stringResource(R.string.settings_privacy_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.height(4.dp))
+                            Text(
+                                text = stringResource(R.string.settings_privacy_body),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            Spacer(Modifier.height(20.dp))
+
+                            OutlinedButton(
+                                onClick = onDonateClick,
+                                modifier = Modifier.fillMaxWidth().testTag(TAG_SETTINGS_DONATE)
+                            ) {
+                                Icon(
+                                    Icons.Outlined.FavoriteBorder,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(stringResource(R.string.action_support_dev))
+                            }
                         }
                     }
                 }
             }
         }
-        item { HorizontalDivider() }
+    }
+}
 
-        // ─── Section "Modèles météo" ────────────────────────────────────
-        // Header + description + sélecteur de tri. Le sélecteur est intégré
-        // ici pour rester proche du contexte "cette liste concerne les
-        // modèles" — le déplacer plus haut/bas romprait le fil narratif.
-        item {
-            Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_models_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_models_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = stringResource(R.string.model_metadata_explanation),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                ModelSortSelector(selected = sortMode, onSelect = { sortMode = it })
+/** Pages des réglages, dans l'ordre de la liste principale. */
+internal enum class SettingsPage { APPEARANCE, SYNC_NOTIFICATIONS, MODELS, ABOUT }
+
+@Composable
+internal fun settingsPageTitle(page: SettingsPage): String = stringResource(
+    when (page) {
+        SettingsPage.APPEARANCE -> R.string.settings_appearance
+        SettingsPage.SYNC_NOTIFICATIONS -> R.string.settings_page_sync
+        SettingsPage.MODELS -> R.string.settings_page_models
+        SettingsPage.ABOUT -> R.string.settings_about_title
+    }
+)
+
+/** Liste principale : une ligne par page, avec ce qu'elle contient. */
+private fun androidx.compose.foundation.lazy.LazyListScope.settingsHub(onOpenPage: (SettingsPage) -> Unit) {
+    SettingsPage.entries.forEach { page ->
+        item(key = "page_${page.name}") {
+            val (icon, summary) = when (page) {
+                SettingsPage.APPEARANCE -> Icons.Outlined.Palette to R.string.settings_page_appearance_desc
+                SettingsPage.SYNC_NOTIFICATIONS -> Icons.Outlined.Sync to R.string.settings_page_sync_desc
+                SettingsPage.MODELS -> Icons.Outlined.Tune to R.string.settings_page_models_desc
+                SettingsPage.ABOUT -> Icons.Outlined.Info to R.string.settings_page_about_desc
             }
-        }
-
-        // Rendu de la liste avec headers de section selon le tri. Une seule
-        // méthode qui écrit dans le LazyListScope — évite de dupliquer la
-        // logique de LazyColumn.items par mode.
-        renderModelList(
-            enabledModels = enabledModels,
-            sortMode = sortMode,
-            onToggle = onToggle
-        )
-
-        item {
-            Spacer(Modifier.height(16.dp))
-            Text(
-                text = stringResource(R.string.settings_models_min_warning),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 16.dp)
+            ListItem(
+                headlineContent = { Text(settingsPageTitle(page)) },
+                supportingContent = { Text(stringResource(summary)) },
+                leadingContent = {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                },
+                modifier = Modifier
+                    .clickable { onOpenPage(page) }
+                    .testTag("$TAG_SETTINGS_PAGE${page.name}")
             )
-        }
-
-        // Section "À propos"
-        item {
-            Spacer(Modifier.height(24.dp))
-            HorizontalDivider()
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_about_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(
-                        R.string.settings_about_version,
-                        com.meteocompare.app.BuildConfig.VERSION_NAME
-                    ),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.settings_about_data_source),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                OpenMeteoAttribution(
-                    home = false,
-                    text = stringResource(R.string.open_meteo_link_label),
-                    style = MaterialTheme.typography.bodySmall
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.settings_about_marine),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.settings_about_models_credit),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    text = stringResource(R.string.settings_privacy_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_privacy_body),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
-                Spacer(Modifier.height(20.dp))
-
-                OutlinedButton(
-                    onClick = onDonateClick,
-                    modifier = Modifier.fillMaxWidth().testTag(TAG_SETTINGS_DONATE)
-                ) {
-                    Icon(
-                        Icons.Outlined.FavoriteBorder,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.action_support_dev))
-                }
-            }
-        }
-
-        // Action de maintenance volontairement placée tout en bas : elle ne
-        // fait pas partie des réglages courants et doit rester exceptionnelle.
-        item {
-            HorizontalDivider()
-            Column(modifier = Modifier.padding(16.dp)) {
-                Text(
-                    text = stringResource(R.string.settings_bias_refresh_title),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold
-                )
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = stringResource(R.string.settings_bias_refresh_desc),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(12.dp))
-                OutlinedButton(
-                    onClick = onBiasRefreshClick,
-                    enabled = !biasRefreshRequested,
-                    modifier = Modifier.fillMaxWidth().testTag(TAG_SETTINGS_BIAS_REFRESH)
-                ) {
-                    Icon(
-                        Icons.Outlined.Refresh,
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp)
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(stringResource(R.string.settings_bias_refresh_action))
-                }
-                if (biasRefreshRequested) {
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.settings_bias_refresh_queued),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                }
-            }
         }
     }
 }
@@ -1075,6 +1134,7 @@ private fun RefreshIntervalSelector(
 }
 
 internal const val TAG_SETTINGS_ROOT = "settings_root"
+internal const val TAG_SETTINGS_PAGE = "settings_page_"
 internal const val TAG_SETTINGS_BACK = "settings_back"
 internal const val TAG_SETTINGS_DONATE = "settings_donate"
 internal const val TAG_SETTINGS_BIAS_REFRESH = "settings_bias_refresh"

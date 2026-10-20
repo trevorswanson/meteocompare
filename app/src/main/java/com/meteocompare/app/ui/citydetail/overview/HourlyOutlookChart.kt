@@ -118,6 +118,7 @@ internal fun HourlyOutlookChart(
     val zone = remember(timezone) { resolveCityZone(timezone) }
     val hourFormatter = remember(locale, clock) { WeatherTimeFormat.hour(locale, clock) }
     val clockFormatter = remember(locale, clock) { WeatherTimeFormat.clock(locale, clock) }
+    val sunFormatter = remember(locale, clock) { WeatherTimeFormat.clockCompact(locale, clock) }
     val resources = LocalResources.current
     val description = remember(points, traces, units, zone, hourFormatter, resources, locale) {
         hourlyOutlookDescription(resources, units, points, traces, zone, hourFormatter, locale)
@@ -309,7 +310,7 @@ internal fun HourlyOutlookChart(
                         modifier = Modifier.size(16.dp)
                     )
                     Text(
-                        text = event.at.atZone(zone).format(clockFormatter),
+                        text = event.at.atZone(zone).format(sunFormatter),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,

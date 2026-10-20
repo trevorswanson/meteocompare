@@ -83,9 +83,7 @@ internal fun narrativeText(sentences: List<NarrativeSentence>, timezone: String?
     val clock = LocalClockFormatPreference.current
     val zone = remember(timezone) { resolveCityZone(timezone) }
     val hourFormatter = remember(locale, clock) { WeatherTimeFormat.hour(locale, clock) }
-    val clockFormatter = remember(locale, clock) { WeatherTimeFormat.clock(locale, clock) }
     fun hour(at: Instant) = at.atZone(zone).format(hourFormatter)
-    fun clockTime(at: Instant) = at.atZone(zone).format(clockFormatter)
 
     return sentences.map { sentence ->
         when (sentence) {
@@ -129,9 +127,6 @@ internal fun narrativeText(sentences: List<NarrativeSentence>, timezone: String?
                     else -> R.string.overview_narrative_tomorrow_cooler
                 }
             )
-            is NarrativeSentence.Solar -> stringResource(
-                if (sentence.event.sunset) R.string.overview_narrative_sunset else R.string.overview_narrative_sunrise,
-                clockTime(sentence.event.at)
             )
         }
     }.joinToString(" ")

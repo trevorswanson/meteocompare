@@ -87,6 +87,12 @@
     <string name="settings_models_desc">Modelle für den Vergleich wählen. Mehr Modelle bereichern den Vergleich, benötigen aber mehr Daten. Änderungen werden beim Verlassen der Einstellungen gemeinsam angewendet.</string>
     <string name="settings_models_min_warning">Mindestens ein Modell muss aktiviert bleiben.</string>
     <string name="settings_about_title">Über die App</string>
+    <string name="settings_page_sync">Synchronisierung &amp; Benachrichtigungen</string>
+    <string name="settings_page_models">Modelle</string>
+    <string name="settings_page_appearance_desc">Design, Sprache, Zeitformat, Einheiten</string>
+    <string name="settings_page_sync_desc">Aktualisierungsintervall, Warnungen und Tagesübersicht</string>
+    <string name="settings_page_models_desc">Prognose-Engine, Wettermodelle, Bias-Verfolgung</string>
+    <string name="settings_page_about_desc">Version, Datenquellen, Datenschutz, Unterstützung</string>
     <string name="settings_about_version">Version %s</string>
     <string name="settings_about_data_source">Wetterdaten: Open-Meteo. MeteoCompare aggregiert und verarbeitet diese Daten für Vergleiche, Szenarien und Indikatoren.</string>
     <string name="open_meteo_attribution">Daten: Open-Meteo · CC BY 4.0 · von MeteoCompare aggregiert und verarbeitet</string>
@@ -1066,8 +1072,6 @@ Daten</string>
     <string name="overview_narrative_tomorrow_much_warmer">Morgen wird es deutlich wärmer.</string>
     <string name="overview_narrative_tomorrow_cooler">Morgen wird es kühler.</string>
     <string name="overview_narrative_tomorrow_much_cooler">Morgen wird es deutlich kühler.</string>
-    <string name="overview_narrative_sunset">Sonnenuntergang um %1$s.</string>
-    <string name="overview_narrative_sunrise">Sonnenaufgang um %1$s.</string>
     <string name="overview_rain_chance_a11y">%1$d%% Regenwahrscheinlichkeit</string>
     <string name="overview_model_details_title">Modelldetails</string>
     <string name="overview_model_details_subtitle">Jedes Modell, lokale Zuverlässigkeit, Diagramme und Engines</string>

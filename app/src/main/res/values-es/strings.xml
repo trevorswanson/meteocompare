@@ -87,6 +87,12 @@
     <string name="settings_models_desc">Elige los modelos a comparar. Más modelos enriquecen la comparación, pero cargan más datos. Los cambios se aplican juntos al salir de Ajustes.</string>
     <string name="settings_models_min_warning">Debe quedar al menos un modelo activado.</string>
     <string name="settings_about_title">Acerca de</string>
+    <string name="settings_page_sync">Sincronización y notificaciones</string>
+    <string name="settings_page_models">Modelos</string>
+    <string name="settings_page_appearance_desc">Tema, idioma, formato de hora, unidades</string>
+    <string name="settings_page_sync_desc">Intervalo de actualización, alertas y resumen diario</string>
+    <string name="settings_page_models_desc">Motor de previsión, modelos meteorológicos, seguimiento de sesgos</string>
+    <string name="settings_page_about_desc">Versión, fuentes de datos, privacidad, apoyo</string>
     <string name="settings_about_version">Versión %s</string>
     <string name="settings_about_data_source">Datos meteorológicos: Open-Meteo. MeteoCompare agrega y transforma estos datos para producir sus comparaciones, escenarios e indicadores.</string>
     <string name="open_meteo_attribution">Datos: Open-Meteo · CC BY 4.0 · agregados y transformados por MeteoCompare</string>
@@ -1069,8 +1075,6 @@ datos</string>
     <string name="overview_narrative_tomorrow_much_warmer">Mañana hará mucho más calor.</string>
     <string name="overview_narrative_tomorrow_cooler">Mañana hará más fresco.</string>
     <string name="overview_narrative_tomorrow_much_cooler">Mañana hará mucho más fresco.</string>
-    <string name="overview_narrative_sunset">Puesta de sol a las %1$s.</string>
-    <string name="overview_narrative_sunrise">Salida del sol a las %1$s.</string>
     <string name="overview_rain_chance_a11y">%1$d%% de probabilidad de lluvia</string>
     <string name="overview_model_details_title">Detalles de los modelos</string>
     <string name="overview_model_details_subtitle">Cada modelo, fiabilidad local, gráficos y motores</string>

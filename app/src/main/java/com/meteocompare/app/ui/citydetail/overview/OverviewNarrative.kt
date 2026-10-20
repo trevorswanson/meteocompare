@@ -3,7 +3,6 @@ package com.meteocompare.app.ui.citydetail.overview
 import com.meteocompare.app.domain.model.CityForecast
 import com.meteocompare.app.domain.util.forecastSolarWindow
 import com.meteocompare.app.ui.citydetail.SimplifiedTimelinePoint
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -37,7 +36,6 @@ internal sealed interface NarrativeSentence {
     /** Écart notable entre la maximale de demain et celle d'aujourd'hui. */
     data class TomorrowTrend(val warmer: Boolean, val strong: Boolean) : NarrativeSentence
 
-    data class Solar(val event: SolarEvent) : NarrativeSentence
 }
 
 internal enum class RainStartLikelihood {
@@ -63,14 +61,12 @@ internal fun buildOverviewNarrative(
     precipitation: List<OverviewPrecipHour>,
     daily: List<SimplifiedTimelinePoint>,
     today: LocalDate,
-    solarEvent: SolarEvent?,
     scope: OutlookScope = OutlookScope.NEXT_24_HOURS
 ): List<NarrativeSentence> = listOfNotNull(
     skySentence(periods, scope),
     rainStartSentence(precipitation, scope),
     // « Demain » n'a de sens que pour les 24 prochaines heures.
-    if (scope == OutlookScope.NEXT_24_HOURS) tomorrowTrend(daily, today) else null,
-    solarEvent?.let(NarrativeSentence::Solar)
+    if (scope == OutlookScope.NEXT_24_HOURS) tomorrowTrend(daily, today) else null
 )
 
 private fun skySentence(periods: List<PeriodSummary>, scope: OutlookScope): NarrativeSentence.Sky? {
@@ -132,7 +128,6 @@ private fun tomorrowTrend(
     return NarrativeSentence.TomorrowTrend(warmer = delta > 0, strong = abs(delta) >= STRONG_TREND_C)
 }
 
-/** Prochain lever ou coucher du soleil dans les 24 h, s'il est connu. */
 /** Levers et couchers entre [start] et [end] inclus, dans l'ordre. */
 internal fun solarEventsBetween(forecast: CityForecast, start: Instant, end: Instant, zone: ZoneId): List<SolarEvent> {
     val firstDay = start.atZone(zone).toLocalDate().minusDays(1)
@@ -150,19 +145,4 @@ internal fun solarEventsBetween(forecast: CityForecast, start: Instant, end: Ins
         .distinctBy { it.at }
         .sortedBy { it.at }
         .toList()
-}
-
-internal fun nextSolarEvent(forecast: CityForecast, now: Instant, zone: ZoneId): SolarEvent? {
-    val today = now.atZone(zone).toLocalDate()
-    val limit = now.plus(Duration.ofHours(24))
-    return listOf(today, today.plusDays(1))
-        .map { forecastSolarWindow(forecast, it) }
-        .flatMap { window ->
-            listOfNotNull(
-                window.sunrise?.let { SolarEvent(sunset = false, at = it) },
-                window.sunset?.let { SolarEvent(sunset = true, at = it) }
-            )
-        }
-        .filter { it.at.isAfter(now) && it.at.isBefore(limit) }
-        .minByOrNull { it.at }
 }

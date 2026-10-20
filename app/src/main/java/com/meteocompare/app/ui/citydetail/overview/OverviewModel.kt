@@ -41,7 +41,6 @@ internal data class OverviewModel(
     val precipitation: List<OverviewPrecipHour>,
     val periods: List<PeriodSummary>,
     val narrative: List<NarrativeSentence>,
-    val solarEvent: SolarEvent?,
     /** Étendue min → max des lignées pour chaque jour (barres « autres modèles »). */
     val dailyRanges: Map<LocalDate, DailyFamilyRange> = emptyMap(),
     /** Levers et couchers dans la fenêtre horaire (repères et nuit sur la courbe). */
@@ -72,7 +71,6 @@ internal fun buildOverviewModel(
     val zone = resolveZoneOrUtc(forecast.city.timezone)
     val core = hourlyCore(forecast, hourly, zone, OutlookScope.NEXT_24_HOURS, maxFamilies)
     val dailyPoints = daily.filter { it.date != null }
-    val solarEvent = nextSolarEvent(forecast, now, zone)
 
     return OverviewModel(
         hourly = core.hourly,
@@ -87,10 +85,8 @@ internal fun buildOverviewModel(
             periods = core.periods,
             precipitation = core.precipitation,
             daily = dailyPoints,
-            today = now.atZone(zone).toLocalDate(),
-            solarEvent = solarEvent
+            today = now.atZone(zone).toLocalDate()
         ),
-        solarEvent = solarEvent,
         dailyRanges = buildDailyFamilyRanges(forecast),
         timelineSolarEvents = core.solarEvents
     )
@@ -119,8 +115,6 @@ internal fun buildDayOutlook(
             precipitation = core.precipitation,
             daily = emptyList(),
             today = date,
-            // Lever et coucher sont déjà sur la courbe du jour : pas de phrase.
-            solarEvent = null,
             scope = OutlookScope.SINGLE_DAY
         ),
         solarEvents = core.solarEvents

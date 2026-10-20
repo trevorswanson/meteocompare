@@ -88,6 +88,12 @@
     <string name="settings_models_desc">Choisissez les modèles comparés. Plus de modèles enrichit la comparaison, mais augmente les données à charger. Les changements sont appliqués ensemble en quittant les réglages.</string>
     <string name="settings_models_min_warning">Au moins un modèle doit rester activé.</string>
     <string name="settings_about_title">À propos</string>
+    <string name="settings_page_sync">Synchronisation et notifications</string>
+    <string name="settings_page_models">Modèles</string>
+    <string name="settings_page_appearance_desc">Thème, langue, format de l’heure, unités</string>
+    <string name="settings_page_sync_desc">Fréquence d’actualisation, alertes et résumé quotidien</string>
+    <string name="settings_page_models_desc">Moteur de prévision, modèles météo, suivi des biais</string>
+    <string name="settings_page_about_desc">Version, sources de données, confidentialité, soutien</string>
     <string name="settings_about_version">Version %s</string>
     <string name="settings_about_data_source">Données météo : Open-Meteo. MeteoCompare agrège et transforme ces données pour produire ses comparaisons, scénarios et indicateurs.</string>
     <string name="open_meteo_attribution">Données : Open-Meteo · CC BY 4.0 · agrégées et transformées par MeteoCompare</string>
@@ -1083,8 +1089,6 @@
     <string name="overview_narrative_tomorrow_much_warmer">Demain, il fera nettement plus chaud.</string>
     <string name="overview_narrative_tomorrow_cooler">Demain, il fera plus frais.</string>
     <string name="overview_narrative_tomorrow_much_cooler">Demain, il fera nettement plus frais.</string>
-    <string name="overview_narrative_sunset">Coucher du soleil à %1$s.</string>
-    <string name="overview_narrative_sunrise">Lever du soleil à %1$s.</string>
     <string name="overview_rain_chance_a11y">%1$d %% de risque de pluie</string>
     <string name="overview_model_details_title">Détails des modèles</string>
     <string name="overview_model_details_subtitle">Chaque modèle, fiabilité locale, graphiques et moteurs</string>

@@ -12,6 +12,7 @@ import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.unit.dp
+import androidx.compose.runtime.mutableStateOf
 import com.meteocompare.app.domain.model.ClockFormatPreference
 import com.meteocompare.app.domain.model.ForecastEngine
 import com.meteocompare.app.domain.model.LanguagePreference
@@ -27,6 +28,8 @@ import org.junit.Test
 
 class SettingsContentTest {
     @get:Rule val composeRule = createComposeRule()
+
+    private val page = mutableStateOf<SettingsPage?>(null)
 
     private fun content(
         enabled: Set<WeatherModel> = WeatherModel.MVP_SELECTION.toSet(),
@@ -56,15 +59,37 @@ class SettingsContentTest {
                     biasRefreshRequested = biasRefreshRequested,
                     onBiasRefreshClick = onBiasRefresh,
                     onDonateClick = onDonate,
-                    padding = PaddingValues(0.dp)
+                    padding = PaddingValues(0.dp),
+                    page = page.value,
+                    onOpenPage = { page.value = it }
                 )
             }
         }
     }
 
+    /** Ouvre la page qui contient [tag], puis fait défiler jusqu'à lui. */
     private fun scrollTo(tag: String) {
+        val target = when {
+            tag.startsWith(TAG_SETTINGS_THEME) || tag.startsWith(TAG_SETTINGS_LANGUAGE) -> SettingsPage.APPEARANCE
+            tag.startsWith(TAG_SETTINGS_REFRESH) -> SettingsPage.SYNC_NOTIFICATIONS
+            tag == TAG_SETTINGS_DONATE -> SettingsPage.ABOUT
+            else -> SettingsPage.MODELS
+        }
+        if (page.value != target) {
+            composeRule.runOnIdle { page.value = target }
+        }
         composeRule.onNodeWithTag(TAG_SETTINGS_ROOT)
             .performScrollToNode(hasTestTag(tag))
+    }
+
+    @Test
+    fun main_list_opens_each_page() {
+        content()
+        SettingsPage.entries.forEach { target ->
+            composeRule.runOnIdle { page.value = null }
+            composeRule.onNodeWithTag("$TAG_SETTINGS_PAGE${target.name}").performClick()
+            composeRule.runOnIdle { assertEquals(target, page.value) }
+        }
     }
 
     @Test

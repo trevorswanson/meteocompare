@@ -54,6 +54,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.ColorMatrix
 import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Path
@@ -63,6 +65,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -565,6 +568,9 @@ private fun RadarStage(
     val radar = remember(state.displayImage) { state.displayImage?.toImageBitmap() }
     val background = MaterialTheme.colorScheme.surfaceVariant
     val markerColor = MaterialTheme.colorScheme.primary
+    // OpenStreetMap n'a pas de style sombre : en thème sombre, les tuiles
+    // sont inversées (teinte conservée) pour suivre l'apparence de l'app.
+    val baseMapFilter = if (MaterialTheme.colorScheme.surface.luminance() < 0.5f) DarkBaseMapFilter else null
     Canvas(
         modifier = modifier
             .background(background)
@@ -585,7 +591,8 @@ private fun RadarStage(
                     (cx + tile.leftFromCenter * density).roundToInt(),
                     (cy + tile.topFromCenter * density).roundToInt()
                 ),
-                dstSize = androidx.compose.ui.unit.IntSize(tilePx.roundToInt(), tilePx.roundToInt())
+                dstSize = androidx.compose.ui.unit.IntSize(tilePx.roundToInt(), tilePx.roundToInt()),
+                colorFilter = baseMapFilter
             )
         }
         radar?.let { image ->
@@ -602,6 +609,32 @@ private fun RadarStage(
         drawCircle(Color.White.copy(alpha = .95f), radius = 7f * density, center = Offset(cx, cy))
         drawCircle(markerColor, radius = 4f * density, center = Offset(cx, cy))
     }
+}
+
+/**
+ * Inversion « intelligente » des tuiles OSM : négatif puis rotation de teinte
+ * de 180° (l'eau reste bleue, la végétation verte), atténuée à 82 % et
+ * légèrement relevée pour que le fond ne soit pas noir pur. Les sommes de
+ * lignes de la rotation valent 1, d'où le décalage 255 × k + lift.
+ */
+private val DarkBaseMapFilter: ColorFilter = run {
+    val k = 0.82f
+    val lift = 16f
+    val hue = floatArrayOf(
+        -0.574f, 1.430f, 0.144f,
+        0.426f, 0.430f, 0.144f,
+        0.426f, 1.430f, -0.856f
+    )
+    ColorFilter.colorMatrix(
+        ColorMatrix(
+            floatArrayOf(
+                -k * hue[0], -k * hue[1], -k * hue[2], 0f, 255f * k + lift,
+                -k * hue[3], -k * hue[4], -k * hue[5], 0f, 255f * k + lift,
+                -k * hue[6], -k * hue[7], -k * hue[8], 0f, 255f * k + lift,
+                0f, 0f, 0f, 1f, 0f
+            )
+        )
+    )
 }
 
 private fun RadarImage.toImageBitmap(): ImageBitmap =

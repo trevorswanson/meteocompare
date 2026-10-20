@@ -47,7 +47,9 @@ import com.meteocompare.app.ui.home.TAG_MANAGE_REMOVE
 import com.meteocompare.app.ui.home.TAG_MANAGE_ROW
 import com.meteocompare.app.ui.radar.TAG_RADAR_STAGE
 import com.meteocompare.app.ui.settings.TAG_SETTINGS_BACK
+import com.meteocompare.app.ui.settings.SettingsPage
 import com.meteocompare.app.ui.settings.TAG_SETTINGS_ENGINE
+import com.meteocompare.app.ui.settings.TAG_SETTINGS_PAGE
 import com.meteocompare.app.ui.settings.TAG_SETTINGS_ROOT
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
@@ -185,6 +187,7 @@ class MainActivityNavigationTest {
         openHomeWith(TestFixtures.paris)
 
         composeRule.onNodeWithTag(TAG_HOME_SETTINGS).performClick()
+        composeRule.onNodeWithTag("$TAG_SETTINGS_PAGE${SettingsPage.MODELS.name}").performClick()
         val calibrationTag = "$TAG_SETTINGS_ENGINE${ForecastEngine.CALIBRATION.name}"
         composeRule.onNodeWithTag(TAG_SETTINGS_ROOT).performScrollToNode(hasTestTag(calibrationTag))
         composeRule.onNodeWithTag(calibrationTag).performClick()
@@ -194,6 +197,8 @@ class MainActivityNavigationTest {
             }
         }
         composeRule.onNodeWithTag(calibrationTag).assertIsSelected()
+        // Page Modèles → liste des réglages → accueil.
+        composeRule.onNodeWithTag(TAG_SETTINGS_BACK).performClick()
         composeRule.onNodeWithTag(TAG_SETTINGS_BACK).performClick()
 
         openModelDetails()

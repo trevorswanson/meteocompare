@@ -35,9 +35,8 @@ class OverviewNarrativeTest {
     private fun narrative(
         periods: List<PeriodSummary> = emptyList(),
         precipitation: List<OverviewPrecipHour> = emptyList(),
-        daily: List<SimplifiedTimelinePoint> = emptyList(),
-        solar: SolarEvent? = null
-    ) = buildOverviewNarrative(periods, precipitation, daily, today, solar)
+        daily: List<SimplifiedTimelinePoint> = emptyList()
+    ) = buildOverviewNarrative(periods, precipitation, daily, today)
 
     @Test
     fun `les tranches identiques fusionnent et seul le premier changement est decrit`() {
@@ -124,20 +123,17 @@ class OverviewNarrativeTest {
     }
 
     @Test
-    fun `l'ordre des phrases est ciel, pluie, tendance, soleil`() {
-        val solar = SolarEvent(sunset = true, at = start.plusSeconds(5 * 3_600L))
+    fun `l'ordre des phrases est ciel, pluie, tendance`() {
         val result = narrative(
             periods = listOf(period(PeriodPhrase.THIS_AFTERNOON, SkyKind.CLOUDY)),
             precipitation = listOf(
                 hour(0, 0, RainLikelihoodWording.CHANCE, wet = false),
                 hour(1, 65, RainLikelihoodWording.CHANCE, wet = true)
-            ),
-            solar = solar
+            )
         )
 
         assertTrue(result[0] is NarrativeSentence.Sky)
         assertTrue(result[1] is NarrativeSentence.RainStart)
-        assertEquals(NarrativeSentence.Solar(solar), result[2])
-        assertNull(result.getOrNull(3))
+        assertNull(result.getOrNull(2))
     }
 }

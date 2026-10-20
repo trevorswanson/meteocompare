@@ -54,6 +54,13 @@ object WeatherTimeFormat {
         twelveClock(locale)
     } else DateTimeFormatter.ofPattern("HH:mm", locale)
 
+    /**
+     * Heure exacte sans AM/PM (« 7:18 »), là où le moment de la journée se lit
+     * déjà sur l'axe horaire voisin, comme le lever et le coucher sur la courbe.
+     */
+    fun clockCompact(locale: Locale, preference: ClockFormatPreference = ClockFormatPreference.AUTO): DateTimeFormatter =
+        DateTimeFormatter.ofPattern(if (usesTwelveHourClock(locale, preference)) "h:mm" else "HH:mm", locale)
+
     /** Selected point on Chart View. */
     fun dateClock(locale: Locale, preference: ClockFormatPreference = ClockFormatPreference.AUTO): DateTimeFormatter = DateTimeFormatterBuilder()
         .appendPattern("EEE d MMM")

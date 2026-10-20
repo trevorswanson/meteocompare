@@ -88,6 +88,12 @@
     <string name="settings_models_desc">Choose the models to compare. More models enrich the comparison but require more data. Changes are applied together when you leave Settings.</string>
     <string name="settings_models_min_warning">At least one model must remain enabled.</string>
     <string name="settings_about_title">About</string>
+    <string name="settings_page_sync">Sync &amp; notifications</string>
+    <string name="settings_page_models">Models</string>
+    <string name="settings_page_appearance_desc">Theme, language, time format, units</string>
+    <string name="settings_page_sync_desc">Refresh interval, alerts and daily summary</string>
+    <string name="settings_page_models_desc">Forecast engine, weather models, bias tracking</string>
+    <string name="settings_page_about_desc">Version, data sources, privacy, support development</string>
     <string name="settings_about_version">Version %s</string>
     <string name="settings_about_data_source">Weather data: Open-Meteo. MeteoCompare aggregates and transforms this data to produce its comparisons, scenarios, and indicators.</string>
     <string name="open_meteo_attribution">Data: Open-Meteo · CC BY 4.0 · aggregated and transformed by MeteoCompare</string>
@@ -1083,8 +1089,6 @@
     <string name="overview_narrative_tomorrow_much_warmer">Tomorrow will be much warmer.</string>
     <string name="overview_narrative_tomorrow_cooler">Tomorrow will be cooler.</string>
     <string name="overview_narrative_tomorrow_much_cooler">Tomorrow will be much cooler.</string>
-    <string name="overview_narrative_sunset">Sunset at %1$s.</string>
-    <string name="overview_narrative_sunrise">Sunrise at %1$s.</string>
     <string name="overview_rain_chance_a11y">%1$d%% chance of rain</string>
     <string name="overview_model_details_title">Model details</string>
     <string name="overview_model_details_subtitle">Every model, local reliability, charts and engines</string>

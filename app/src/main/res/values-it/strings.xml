@@ -87,6 +87,12 @@
     <string name="settings_models_desc">Scegli i modelli da confrontare. Più modelli arricchiscono il confronto, ma richiedono più dati. Le modifiche vengono applicate insieme quando esci dalle Impostazioni.</string>
     <string name="settings_models_min_warning">Deve rimanere attivo almeno un modello.</string>
     <string name="settings_about_title">Informazioni</string>
+    <string name="settings_page_sync">Sincronizzazione e notifiche</string>
+    <string name="settings_page_models">Modelli</string>
+    <string name="settings_page_appearance_desc">Tema, lingua, formato orario, unità</string>
+    <string name="settings_page_sync_desc">Intervallo di aggiornamento, avvisi e riepilogo giornaliero</string>
+    <string name="settings_page_models_desc">Motore di previsione, modelli meteo, monitoraggio dei bias</string>
+    <string name="settings_page_about_desc">Versione, fonti dei dati, privacy, supporto</string>
     <string name="settings_about_version">Versione %s</string>
     <string name="settings_about_data_source">Dati meteorologici: Open-Meteo. MeteoCompare aggrega e trasforma questi dati per produrre confronti, scenari e indicatori.</string>
     <string name="open_meteo_attribution">Dati: Open-Meteo · CC BY 4.0 · aggregati e trasformati da MeteoCompare</string>
@@ -1069,8 +1075,6 @@ dato</string>
     <string name="overview_narrative_tomorrow_much_warmer">Domani farà molto più caldo.</string>
     <string name="overview_narrative_tomorrow_cooler">Domani farà più fresco.</string>
     <string name="overview_narrative_tomorrow_much_cooler">Domani farà molto più fresco.</string>
-    <string name="overview_narrative_sunset">Tramonto alle %1$s.</string>
-    <string name="overview_narrative_sunrise">Alba alle %1$s.</string>
     <string name="overview_rain_chance_a11y">%1$d%% di probabilità di pioggia</string>
     <string name="overview_model_details_title">Dettagli dei modelli</string>
     <string name="overview_model_details_subtitle">Ogni modello, affidabilità locale, grafici e motori</string>
