@@ -2,7 +2,9 @@
 """Verify Android 16 KiB page-size readiness for release APK/AAB artifacts.
 
 Checks:
-- every packaged ELF shared object's PT_LOAD p_align is >= 16 KiB;
+- every packaged 64-bit ELF shared object's PT_LOAD p_align is >= 16 KiB
+  (16 KiB pages only exist on 64-bit Android: arm64-v8a, x86_64; 32-bit
+  ABIs always run with 4 KiB pages and are reported as skipped);
 - every uncompressed .so in an APK starts at a 16 KiB ZIP data offset;
 - an AAB's BundleConfig.pb requests PAGE_ALIGNMENT_16K for uncompressed native libs.
 
@@ -81,8 +83,16 @@ def elf_load_alignments(data: bytes, name: str) -> list[int]:
     return alignments
 
 
+def elf_is_64bit(data: bytes) -> bool:
+    return len(data) > 4 and data[:4] == b"\x7fELF" and data[4] == 2
+
+
 def verify_elf(data: bytes, name: str) -> None:
-    bad = [align for align in elf_load_alignments(data, name) if align < PAGE_SIZE]
+    alignments = elf_load_alignments(data, name)
+    if not elf_is_64bit(data):
+        # 32-bit processes never use 16 KiB pages (platform and Play policy).
+        return
+    bad = [align for align in alignments if align < PAGE_SIZE]
     if bad:
         formatted = ", ".join(hex(value) for value in bad)
         raise VerificationError(f"{name}: PT_LOAD alignment below 16 KiB ({formatted})")
@@ -125,8 +135,9 @@ def verify_apk(path: Path) -> int:
                         f"{info.filename}: uncompressed ZIP data offset {offset} is not 16 KiB aligned"
                     )
                 zip_alignment = f"aligned (offset={offset})"
+            status = "PASS" if elf_is_64bit(data) else "SKIP(32-bit ELF)"
             print(
-                f"[16KiB][APK] PASS {info.filename} "
+                f"[16KiB][APK] {status} {info.filename} "
                 f"PT_LOAD(min)={min(alignments)} ZIP={zip_alignment}"
             )
         if not entries:
@@ -218,7 +229,8 @@ def verify_aab(path: Path) -> int:
             data = zf.read(info)
             verify_elf(data, info.filename)
             count += 1
-            print(f"[16KiB][AAB] PASS {info.filename} PT_LOAD(min)={min(elf_load_alignments(data, info.filename))}")
+            status = "PASS" if elf_is_64bit(data) else "SKIP(32-bit ELF)"
+            print(f"[16KiB][AAB] {status} {info.filename} PT_LOAD(min)={min(elf_load_alignments(data, info.filename))}")
         if not entries:
             print("[16KiB][AAB] No packaged native libraries (ELF checks not applicable)")
     return count

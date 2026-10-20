@@ -26,6 +26,17 @@ def sample_elf(page_alignment=16384):
     return bytes(data)
 
 
+def sample_elf32(page_alignment=4096):
+    data = bytearray(96)
+    data[:6] = b"\x7fELF\x01\x01"
+    struct.pack_into("<I", data, 28, 52)  # e_phoff
+    struct.pack_into("<H", data, 42, 32)  # e_phentsize
+    struct.pack_into("<H", data, 44, 1)   # e_phnum
+    struct.pack_into("<I", data, 52, 1)   # PT_LOAD
+    struct.pack_into("<I", data, 52 + 28, page_alignment)  # p_align
+    return bytes(data)
+
+
 def add_so(zf, path, contents, align_zip=False):
     info = zipfile.ZipInfo(path)
     info.compress_type = zipfile.ZIP_STORED
@@ -66,6 +77,16 @@ class PageSizeGateTest(unittest.TestCase):
             with contextlib.redirect_stdout(io.StringIO()):
                 with self.assertRaisesRegex(gate.VerificationError, "PT_LOAD alignment below"):
                     gate.verify_apk(path)
+
+    def test_32bit_elf_with_4k_pages_is_skipped_not_rejected(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / "test.apk"
+            with zipfile.ZipFile(path, "w") as zf:
+                add_so(zf, "lib/armeabi-v7a/libtest.so", sample_elf32(), align_zip=True)
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                self.assertEqual(gate.verify_apk(path), 1)
+            self.assertIn("SKIP(32-bit ELF)", output.getvalue())
 
     def test_aab_checks_bundle_alignment_and_elf(self):
         with tempfile.TemporaryDirectory() as temp:
