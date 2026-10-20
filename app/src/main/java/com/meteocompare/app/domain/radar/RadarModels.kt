@@ -183,19 +183,6 @@ data class RadarNowcast(
     val analysisZoom: Int = RADAR_ANALYSIS_ZOOM
 )
 
-/**
- * Position à l'écran (en dp) d'une image d'analyse : pixel (x, y) de l'image
- * → (sourceLeft + x × sourceScale, sourceTop + y × sourceScale). Sans rotation
- * de la carte, la projection Web Mercator est affine : deux coins suffisent.
- */
-data class RadarDisplayGeometry(
-    val sourceLeft: Double,
-    val sourceTop: Double,
-    val sourceScale: Double,
-    val sourceSize: Double,
-    val analysisZoom: Int
-)
-
 data class RadarScene(
     val city: City,
     val metadata: RadarMetadata,

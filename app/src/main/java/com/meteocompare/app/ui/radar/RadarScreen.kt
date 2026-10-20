@@ -3,7 +3,6 @@ package com.meteocompare.app.ui.radar
 import com.meteocompare.app.core.locale.LocalClockFormatPreference
 import com.meteocompare.app.core.locale.WeatherTimeFormat
 
-import android.graphics.Paint as AndroidPaint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -45,7 +44,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,13 +51,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
-import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -70,18 +63,10 @@ import com.meteocompare.app.R
 import com.meteocompare.app.domain.radar.RADAR_PROJECTION_HORIZONS
 import com.meteocompare.app.domain.radar.RadarImpactKind
 import com.meteocompare.app.domain.radar.RadarMode
-import com.meteocompare.app.domain.radar.RadarRainCell
 import com.meteocompare.app.domain.radar.mapResolutionKm
-import com.meteocompare.app.domain.radar.projectRainCell
-import com.meteocompare.app.domain.radar.rainCellContours
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import java.time.format.FormatStyle
-import kotlin.math.atan2
-import kotlin.math.cos
 import kotlin.math.hypot
-import kotlin.math.sin
 import kotlin.math.roundToInt
 
 internal const val TAG_RADAR_STAGE = "radar_stage"
@@ -91,11 +76,6 @@ internal const val TAG_RADAR_RECALCULATE = "radar_recalculate"
 internal const val RADAR_OBSERVATION_ALPHA = .80f
 internal const val RADAR_PROJECTION_OBSERVATION_ALPHA = .38f
 internal fun radarHorizonTag(minutes: Int) = "radar_horizon_$minutes"
-
-private val CELL_COLORS = listOf(
-    Color(0xFF0EA5E9), Color(0xFF8B5CF6), Color(0xFFF97316), Color(0xFF10B981),
-    Color(0xFFE11D48), Color(0xFFEAB308), Color(0xFF14B8A6), Color(0xFF6366F1)
-)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -506,202 +486,6 @@ private fun RadarProjectionSummary(state: RadarUiState.Ready) {
             Text(impactText, style = MaterialTheme.typography.bodySmall)
             Text(stringResource(R.string.radar_projection_detail, medianSpeed, confidence), style = MaterialTheme.typography.labelSmall)
         }
-    }
-}
-
-/**
- * Cellules projetées ; [geometryFor] place à l'écran l'image d'analyse de
- * chaque zoom (calculée depuis la projection de la carte).
- */
-internal fun DrawScope.drawProjectionOverlay(
-    state: RadarUiState.Ready,
-    density: Float,
-    geometryFor: (analysisZoom: Int) -> com.meteocompare.app.domain.radar.RadarDisplayGeometry?
-) {
-    val cells = state.nowcast?.cells.orEmpty().sortedBy { it.impact?.relevanceScore ?: .0 }
-    cells.forEachIndexed { index, cell ->
-        val projection = projectRainCell(cell, state.horizonMinutes.toDouble()) ?: return@forEachIndexed
-        val geometry = geometryFor(cell.analysisZoom) ?: return@forEachIndexed
-        val color = CELL_COLORS[(cell.colorIndex ?: index) % CELL_COLORS.size]
-        val relevance = (cell.impact?.relevanceScore ?: .35).coerceIn(0.0, 1.0)
-        val priority = index >= (cells.size - 4).coerceAtLeast(0) || relevance >= .62
-        val emphasis = if (priority) (.72 + .28 * relevance).toFloat() else (.42 + .28 * relevance).toFloat()
-        val envelope = cellPath(cell, geometry, projection.dx, projection.dy, projection.scaleX, projection.scaleY, projection.uncertaintyPx, density)
-        drawPath(envelope, color.copy(alpha = .035f + .035f * emphasis), style = androidx.compose.ui.graphics.drawscope.Fill)
-        drawPath(
-            envelope,
-            color.copy(alpha = .56f + .34f * emphasis),
-            style = Stroke(
-                width = (1.7f + .5f * emphasis) * density,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(7f * density, 5f * density))
-            )
-        )
-        val contour = cellPath(cell, geometry, projection.dx, projection.dy, projection.scaleX, projection.scaleY, 0.0, density)
-        drawPath(contour, color.copy(alpha = .045f + .045f * emphasis), style = androidx.compose.ui.graphics.drawscope.Fill)
-        drawPath(contour, color.copy(alpha = .76f + .22f * emphasis), style = Stroke(width = (2.1f + .6f * emphasis) * density))
-
-        if (priority) drawObservedMotion(cell, geometry, color, density, .34f + .30f * emphasis)
-        val displacement = hypot(projection.dx, projection.dy) * geometry.sourceScale
-        if (displacement >= 18.0) drawTrajectory(cell, geometry, state.horizonMinutes, color, density, .20f + .68f * emphasis)
-        drawCellLabels(cell, projection.x, projection.y, geometry, color, state.horizonMinutes, density, priority)
-    }
-}
-
-private fun cellPath(
-    cell: RadarRainCell,
-    geometry: com.meteocompare.app.domain.radar.RadarDisplayGeometry,
-    dx: Double,
-    dy: Double,
-    scaleX: Double,
-    scaleY: Double,
-    expandPx: Double,
-    density: Float
-): Path {
-    val path = Path().apply { fillType = PathFillType.EvenOdd }
-    val cx = cell.centroid.x
-    val cy = cell.centroid.y
-    rainCellContours(cell, expandPx).forEach { loop ->
-        if (loop.isEmpty()) return@forEach
-        fun mapped(point: com.meteocompare.app.domain.radar.RadarPoint): Offset {
-            val x = cx + (point.x - cx) * scaleX + dx
-            val y = cy + (point.y - cy) * scaleY + dy
-            return Offset(
-                ((geometry.sourceLeft + x * geometry.sourceScale) * density).toFloat(),
-                ((geometry.sourceTop + y * geometry.sourceScale) * density).toFloat()
-            )
-        }
-        val first = mapped(loop.first())
-        path.moveTo(first.x, first.y)
-        loop.drop(1).forEach { point ->
-            val next = mapped(point)
-            path.lineTo(next.x, next.y)
-        }
-        path.close()
-    }
-    return path
-}
-
-private fun DrawScope.drawObservedMotion(
-    cell: RadarRainCell,
-    geometry: com.meteocompare.app.domain.radar.RadarDisplayGeometry,
-    color: Color,
-    density: Float,
-    alpha: Float
-) {
-    val source = if (cell.motion?.advection != null) cell.observedTrack else cell.track
-    val track = source.takeLast(5)
-    if (track.size < 2) return
-    val points = track.map { point ->
-        Offset(
-            ((geometry.sourceLeft + point.x * geometry.sourceScale) * density).toFloat(),
-            ((geometry.sourceTop + point.y * geometry.sourceScale) * density).toFloat()
-        )
-    }
-    if (hypot((points.last().x - points.first().x).toDouble(), (points.last().y - points.first().y).toDouble()) < 4 * density) return
-    val path = Path().apply {
-        moveTo(points.first().x, points.first().y)
-        points.drop(1).forEach { lineTo(it.x, it.y) }
-    }
-    val dash = PathEffect.dashPathEffect(floatArrayOf(4f * density, 4f * density))
-    drawPath(path, Color(0xFF0F172A).copy(alpha = .66f * alpha), style = Stroke(3.8f * density, pathEffect = dash))
-    drawPath(path, color.copy(alpha = alpha), style = Stroke(1.7f * density, pathEffect = dash))
-    points.forEachIndexed { index, point ->
-        drawCircle(color.copy(alpha = alpha * (.42f + .10f * index)), 2.2f * density, point)
-    }
-}
-
-private fun DrawScope.drawTrajectory(
-    cell: RadarRainCell,
-    geometry: com.meteocompare.app.domain.radar.RadarDisplayGeometry,
-    horizon: Int,
-    color: Color,
-    density: Float,
-    alpha: Float
-) {
-    val points = listOf(0.0, .33, .66, 1.0).map { fraction ->
-        val projection = if (fraction == 0.0) null else projectRainCell(cell, horizon * fraction)
-        val x = projection?.x ?: cell.centroid.x
-        val y = projection?.y ?: cell.centroid.y
-        Offset(
-            ((geometry.sourceLeft + x * geometry.sourceScale) * density).toFloat(),
-            ((geometry.sourceTop + y * geometry.sourceScale) * density).toFloat()
-        )
-    }
-    if (hypot((points.last().x - points.first().x).toDouble(), (points.last().y - points.first().y).toDouble()) < 8 * density) return
-    val path = Path().apply {
-        moveTo(points.first().x, points.first().y)
-        points.drop(1).forEach { lineTo(it.x, it.y) }
-    }
-    drawPath(path, Color(0xFF0F172A).copy(alpha = .72f * alpha), style = Stroke(5f * density))
-    drawPath(path, color.copy(alpha = alpha), style = Stroke(2.4f * density))
-    points.drop(1).dropLast(1).forEach { drawCircle(color.copy(alpha = alpha), 2.6f * density, it) }
-    drawArrowHead(points[points.lastIndex - 1], points.last(), color, density, alpha)
-}
-
-private fun DrawScope.drawArrowHead(from: Offset, to: Offset, color: Color, density: Float, alpha: Float) {
-    val distance = hypot((to.x - from.x).toDouble(), (to.y - from.y).toDouble())
-    if (distance < 5 * density) return
-    val angle = atan2((to.y - from.y).toDouble(), (to.x - from.x).toDouble())
-    val head = 8f * density
-    fun wing(delta: Double) = Offset(
-        (to.x - head * cos(angle + delta)).toFloat(),
-        (to.y - head * sin(angle + delta)).toFloat()
-    )
-    val left = wing(-Math.PI / 6)
-    val right = wing(Math.PI / 6)
-    val arrow = Path().apply {
-        moveTo(left.x, left.y)
-        lineTo(to.x, to.y)
-        lineTo(right.x, right.y)
-    }
-    drawPath(arrow, Color(0xFF0F172A).copy(alpha = .78f * alpha), style = Stroke(4f * density))
-    drawPath(arrow, color.copy(alpha = alpha), style = Stroke(2f * density))
-}
-
-private fun DrawScope.drawCellLabels(
-    cell: RadarRainCell,
-    projectedX: Double,
-    projectedY: Double,
-    geometry: com.meteocompare.app.domain.radar.RadarDisplayGeometry,
-    color: Color,
-    horizon: Int,
-    density: Float,
-    priority: Boolean
-) {
-    val projected = Offset(
-        ((geometry.sourceLeft + projectedX * geometry.sourceScale) * density).toFloat(),
-        ((geometry.sourceTop + projectedY * geometry.sourceScale) * density).toFloat()
-    )
-    val current = Offset(
-        ((geometry.sourceLeft + cell.centroid.x * geometry.sourceScale) * density).toFloat(),
-        ((geometry.sourceTop + cell.centroid.y * geometry.sourceScale) * density).toFloat()
-    )
-    drawOutlinedRadarText("+$horizon", projected.x, projected.y - 12f * density, color, density)
-    if (priority) cell.stableLabel?.let { label ->
-        drawOutlinedRadarText(label, current.x, current.y + 16f * density, color, density)
-    }
-}
-
-private fun DrawScope.drawOutlinedRadarText(text: String, x: Float, y: Float, color: Color, density: Float) {
-    if (x < -20 || x > size.width + 20 || y < -20 || y > size.height + 20) return
-    drawContext.canvas.nativeCanvas.apply {
-        val paint = AndroidPaint(AndroidPaint.ANTI_ALIAS_FLAG).apply {
-            textAlign = AndroidPaint.Align.CENTER
-            textSize = 10f * density
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            style = AndroidPaint.Style.STROKE
-            strokeWidth = 3.5f * density
-            this.color = android.graphics.Color.argb(220, 15, 23, 42)
-        }
-        drawText(text, x, y, paint)
-        paint.style = AndroidPaint.Style.FILL
-        paint.color = android.graphics.Color.argb(
-            (255 * .95f).toInt(),
-            (color.red * 255).toInt(),
-            (color.green * 255).toInt(),
-            (color.blue * 255).toInt()
-        )
-        drawText(text, x, y, paint)
     }
 }
 
