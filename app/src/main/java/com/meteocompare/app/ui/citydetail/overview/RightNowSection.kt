@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
+import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.outlined.Thermostat
@@ -31,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -53,6 +57,8 @@ import com.meteocompare.app.ui.citydetail.resolveCityZone
 import com.meteocompare.app.ui.components.AnimatedWeatherIcon
 import com.meteocompare.app.ui.theme.SectionHeadlineStyle
 import com.meteocompare.app.ui.theme.confidenceColor
+import com.meteocompare.app.ui.theme.temperatureMetricAccent
+import com.meteocompare.app.ui.theme.temperatureMinMetricAccent
 import java.util.Locale
 
 /**
@@ -87,7 +93,7 @@ internal fun RightNowSection(
     } else null
     val nowLabel = currentTemp?.let { stringResource(R.string.overview_now_a11y, units.temp(it, locale = locale)) }
 
-    Column(modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_RIGHT_NOW)) {
+    OverviewPane(modifier = modifier.testTag(TAG_OVERVIEW_RIGHT_NOW)) {
         OverviewSectionTitle(
             text = stringResource(R.string.overview_right_now_title),
             agreement = model.agreement,
@@ -103,9 +109,9 @@ internal fun RightNowSection(
                 },
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(modifier = Modifier.size(112.dp), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.size(96.dp), contentAlignment = Alignment.Center) {
                 if (currentCondition != null) {
-                    AnimatedWeatherIcon(condition = currentCondition, size = 104.dp, isNight = currentIsNight)
+                    AnimatedWeatherIcon(condition = currentCondition, size = 88.dp, isNight = currentIsNight)
                 } else {
                     Icon(
                         imageVector = Icons.Outlined.Thermostat,
@@ -115,21 +121,32 @@ internal fun RightNowSection(
                     )
                 }
             }
-            Spacer(Modifier.width(16.dp))
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = currentTemp?.let { units.temp(it, locale = locale) } ?: "—",
-                    style = MaterialTheme.typography.displayMedium,
-                    fontWeight = FontWeight.Light
-                )
-                conditionLabel?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
-                highLow?.let {
+                // Température actuelle, puis max ↑ et min ↓ du jour sur deux lignes.
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = it,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        text = units.degrees(currentTemp, locale),
+                        style = MaterialTheme.typography.displayMedium,
+                        fontWeight = FontWeight.Light
                     )
+                    if (today?.tempMaxC != null || today?.tempMinC != null) {
+                        Spacer(Modifier.width(14.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                            HighLowLine(
+                                icon = Icons.Filled.ArrowUpward,
+                                tint = temperatureMetricAccent(),
+                                text = units.degrees(today?.tempMaxC, locale)
+                            )
+                            HighLowLine(
+                                icon = Icons.Filled.ArrowDownward,
+                                tint = temperatureMinMetricAccent(),
+                                text = units.degrees(today?.tempMinC, locale)
+                            )
+                        }
+                    }
                 }
+                conditionLabel?.let { Text(it, style = MaterialTheme.typography.titleMedium) }
                 MoreToggle(expanded = showMore, onToggle = { showMore = !showMore })
             }
         }
@@ -143,6 +160,15 @@ internal fun RightNowSection(
                 locale = locale
             )
         }
+    }
+}
+
+@Composable
+private fun HighLowLine(icon: ImageVector, tint: Color, text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(imageVector = icon, contentDescription = null, tint = tint, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(2.dp))
+        Text(text = text, style = MaterialTheme.typography.titleMedium, maxLines = 1)
     }
 }
 
@@ -201,7 +227,7 @@ private fun RightNowDetails(
             add(stringResource(R.string.overview_detail_humidity) to stringResource(R.string.overview_percent, it))
         }
         current?.dewPointC?.let {
-            add(stringResource(R.string.overview_detail_dew_point) to units.temp(it, locale = locale))
+            add(stringResource(R.string.overview_detail_dew_point) to units.degrees(it, locale))
         }
         uvIndex?.takeIf { it.isFinite() && it >= 0.0 }?.let {
             add(stringResource(R.string.overview_detail_uv) to stringResource(R.string.uv_index_value, it))
@@ -218,7 +244,7 @@ private fun RightNowDetails(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 12.dp)
-            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(16.dp))
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(16.dp))
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {

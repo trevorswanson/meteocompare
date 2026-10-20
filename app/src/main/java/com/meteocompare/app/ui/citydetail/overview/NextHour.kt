@@ -3,7 +3,6 @@ package com.meteocompare.app.ui.citydetail.overview
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -238,8 +237,8 @@ internal fun nextHourSummary(outlook: NextHourOutlook): String {
 @Composable
 internal fun NextHourSection(outlook: NextHourOutlook, modifier: Modifier = Modifier) {
     val summary = nextHourSummary(outlook)
-    Column(
-        modifier = modifier.fillMaxWidth().testTag(TAG_OVERVIEW_NEXT_HOUR),
+    OverviewPane(
+        modifier = modifier.testTag(TAG_OVERVIEW_NEXT_HOUR),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         OverviewSectionTitle(

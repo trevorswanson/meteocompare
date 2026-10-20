@@ -3,6 +3,7 @@ package com.meteocompare.app.ui.citydetail.overview
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -19,9 +20,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
@@ -67,7 +70,7 @@ internal fun OverviewContent(
                 .fillMaxWidth()
                 .dismissTimelineTooltipOnTouch(tooltipHost)
                 .testTag(TAG_OVERVIEW_SECTION),
-            verticalArrangement = Arrangement.spacedBy(28.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             RightNowSection(
                 model = model,
@@ -83,7 +86,7 @@ internal fun OverviewContent(
 
             nextHour?.let { NextHourSection(it) }
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            OverviewPane(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OverviewSectionTitle(stringResource(R.string.overview_next_24h_title))
                 val summary = narrativeText(model.narrative, timezone)
                 if (summary.isNotBlank()) {
@@ -107,7 +110,7 @@ internal fun OverviewContent(
             }
 
             if (model.daily.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OverviewPane(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OverviewSectionTitle(stringResource(R.string.overview_next_days_title))
                     DailyOutlook(
                         days = model.daily,
@@ -126,6 +129,34 @@ internal fun OverviewContent(
         }
     }
 }
+
+/**
+ * Panneau Material 3 : chaque section de l'aperçu (Maintenant, Prochaine
+ * heure, 24 heures, 10 jours) est posée dans son propre conteneur.
+ */
+@Composable
+internal fun OverviewPane(
+    modifier: Modifier = Modifier,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Surface(
+        shape = RoundedCornerShape(28.dp),
+        color = overviewPaneColor(),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 18.dp),
+            verticalArrangement = verticalArrangement,
+            content = content
+        )
+    }
+}
+
+/** Fond des panneaux ; les courbes s'en servent pour le halo des températures. */
+@Composable
+@ReadOnlyComposable
+internal fun overviewPaneColor(): Color = MaterialTheme.colorScheme.surfaceContainer
 
 /** Unique accès vers la comparaison complète des modèles (fiche détaillée historique). */
 @Composable

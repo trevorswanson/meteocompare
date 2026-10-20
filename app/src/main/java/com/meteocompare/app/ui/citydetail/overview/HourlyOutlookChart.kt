@@ -146,7 +146,8 @@ internal fun HourlyOutlookChart(
     }
 
     val textColor = MaterialTheme.colorScheme.onSurface
-    val surfaceColor = MaterialTheme.colorScheme.surface
+    // Fond réel sous la courbe : celui du panneau, pas de la page.
+    val surfaceColor = overviewPaneColor()
     // Trait un peu en retrait du texte (plus clair en thème clair, plus
     // sombre en thème sombre) pour que les températures restent lisibles
     // quand elles chevauchent la courbe.
